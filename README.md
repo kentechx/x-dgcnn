@@ -2,6 +2,9 @@
 
 # x_dgcnn
 
+An optimized [DGCNN](https://arxiv.org/abs/1801.07829) based
+on [antao97's version](https://github.com/antao97/dgcnn.pytorch).
+
 [![PyPI version](https://badge.fury.io/py/x-dgcnn.svg)](https://badge.fury.io/py/x-dgcnn)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -38,7 +41,7 @@ category = torch.randint(0, 10, (20,))
 out = model(x, xyz, category)
 ```
 
-## Citation
+## References
 
 ```bibtex
 @article{wang2019dynamic,
