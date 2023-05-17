@@ -1,3 +1,5 @@
+<img src="./dgcnn.jpg" width="1200px"></img>
+
 # x_dgcnn
 
 [![PyPI version](https://badge.fury.io/py/x-dgcnn.svg)](https://badge.fury.io/py/x-dgcnn)
