@@ -37,7 +37,7 @@ class EdgeConv(nn.Module):
         super().__init__()
         self.k = k
 
-        dims = (dims[0] * 2, *dims)
+        dims = (dims[0] * 2, *dims[1:])
         self.mlp = nn.Sequential(*[
             nn.Sequential(nn.Linear(in_d, out_d, bias=False),
                           nn.LayerNorm(out_d),
