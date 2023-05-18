@@ -63,9 +63,7 @@ class EdgeConv(nn.Module):
         # x: (b, n, d)
         x = self.route(x, neighbor_ind)  # (b, n, k, 2*d)
 
-        x = rearrange(x, 'b n k d -> b (n k) d')
         x = self.mlp(x)
-        x = rearrange(x, 'b (n k) d -> b n k d', k=self.k)
         x = x.max(dim=2, keepdim=False)[0]  # (b, n, k, d) -> (b, n, d)
         return x
 
