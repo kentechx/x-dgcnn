@@ -55,7 +55,7 @@ python main_cls.py --exp_name=cls_1024_dgcnn_eval --num_points=1024 --k=20 --eva
 - 2048 points
 
 ``` 
-python main_cls.py --exp_name=cls_2048_dgcnn_eval --num_points=2048 --k=40 --eval=True --model_path=outputs/cls_2048/models/model.t7 --model=xdgcnn_dgcnn
+python main_cls.py --exp_name=cls_2048_dgcnn_eval --num_points=2048 --k=40 --eval=True --model_path=outputs/cls_2048_dgcnn/models/model.t7 --model=xdgcnn_dgcnn
 ```
 
 ### Performance:
@@ -72,7 +72,7 @@ can handle a batch size of 32 (~17G GPU memory used).
 |         DGCNN (x-dgcnn, 1024 points)         |    **90.1**    |  **92.6**   |
 | DGCNN (dgcnn.pytorch, 2048 points, batch 16) |      89.1      |    92.6     |
 |    DGCNN (x-dgcnn, 2048 points, batch 16)    |                |             |
-|    DGCNN (x-dgcnn, 2048 points, batch 32)    |                |             |
+|    DGCNN (x-dgcnn, 2048 points, batch 32)    |      90.0      |    92.7     |
 
 &nbsp;
 
