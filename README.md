@@ -61,6 +61,7 @@ python main_cls.py --exp_name=cls_2048_dgcnn_eval --num_points=2048 --k=40 --eva
 ### Performance:
 
 ModelNet40 dataset
+
 Please note that the implementation in [dgcnn.pytorch](https://github.com/antao97/dgcnn.pytorch) consumes more GPU
 memory, allowing us to only use a batch size of 16 for 2048 points on a single 3090 GPU. In contrast, our implementation
 can handle a batch size of 32 (~17G GPU memory used).
