@@ -20,6 +20,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+import x_dgcnn
 from torch.optim.lr_scheduler import CosineAnnealingLR, StepLR
 from data import ModelNet40
 from model import PointNet, DGCNN_cls
@@ -54,6 +55,8 @@ def train(args, io):
         model = PointNet(args).to(device)
     elif args.model == 'dgcnn':
         model = DGCNN_cls(args).to(device)
+    elif args.model == 'xdgcnn_dgcnn':
+        model = x_dgcnn.DGCNN_Cls(k=args.k, in_dim=3, out_dim=40, dropout=args.dropout)
     else:
         raise Exception("Not implemented")
 
@@ -91,7 +94,10 @@ def train(args, io):
             data = data.permute(0, 2, 1)
             batch_size = data.size()[0]
             opt.zero_grad()
-            logits = model(data)
+            if args.model == 'xdgcnn_dgcnn':
+                logits = model(data.transpose(1, 2).contiguous(), data.transpose(1, 2).clone())
+            else:
+                logits = model(data)
             loss = criterion(logits, label)
             loss.backward()
             opt.step()
@@ -131,7 +137,10 @@ def train(args, io):
             data, label = data.to(device), label.to(device).squeeze()
             data = data.permute(0, 2, 1)
             batch_size = data.size()[0]
-            logits = model(data)
+            if args.model == 'xdgcnn_dgcnn':
+                logits = model(data.transpose(1, 2).contiguous(), data.transpose(1, 2).clone())
+            else:
+                logits = model(data)
             loss = criterion(logits, label)
             preds = logits.max(dim=1)[1]
             count += batch_size
@@ -163,6 +172,8 @@ def test(args, io):
         model = PointNet(args).to(device)
     elif args.model == 'dgcnn':
         model = DGCNN_cls(args).to(device)
+    elif args.model == 'xdgcnn_dgcnn':
+        model = x_dgcnn.DGCNN_Cls(k=args.k, in_dim=3, out_dim=40, dropout=args.dropout)
     else:
         raise Exception("Not implemented")
 
@@ -178,7 +189,10 @@ def test(args, io):
         data, label = data.to(device), label.to(device).squeeze()
         data = data.permute(0, 2, 1)
         batch_size = data.size()[0]
-        logits = model(data)
+        if args.model == 'xdgcnn_dgcnn':
+            logits = model(data.transpose(1, 2).contiguous(), data.transpose(1, 2).clone())
+        else:
+            logits = model(data)
         preds = logits.max(dim=1)[1]
         test_true.append(label.cpu().numpy())
         test_pred.append(preds.detach().cpu().numpy())
@@ -196,7 +210,7 @@ if __name__ == "__main__":
     parser.add_argument('--exp_name', type=str, default='exp', metavar='N',
                         help='Name of the experiment')
     parser.add_argument('--model', type=str, default='dgcnn', metavar='N',
-                        choices=['pointnet', 'dgcnn'],
+                        choices=['pointnet', 'dgcnn', 'xdgcnn_dgcnn'],
                         help='Model to use, [pointnet, dgcnn]')
     parser.add_argument('--dataset', type=str, default='modelnet40', metavar='N',
                         choices=['modelnet40'])
