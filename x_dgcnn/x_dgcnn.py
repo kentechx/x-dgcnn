@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from einops import repeat, rearrange, einsum, reduce
-from x_dgcnn.route import subset_topk
+from .route import subset_topk
 
 
 def exists(val):
@@ -38,12 +38,18 @@ class EdgeConv(nn.Module):
         self.k = k
 
         dims = (dims[0] * 2, *dims[1:])
-        self.mlp = nn.Sequential(*[
-            nn.Sequential(nn.Linear(in_d, out_d, bias=False),
-                          nn.LayerNorm(out_d),
-                          nn.GELU())
-            for in_d, out_d in zip(dims[:-1], dims[1:])
-        ])
+        if len(dims) > 2:
+            self.mlp = nn.Sequential(*[
+                nn.Sequential(nn.Linear(in_d, out_d, bias=False),
+                              nn.LayerNorm(out_d),
+                              nn.GELU())
+                for in_d, out_d in zip(dims[:-2], dims[1:-1])
+            ])
+            self.mlp.append(nn.Linear(dims[-2], dims[-1], bias=False))
+        else:
+            self.mlp = nn.Linear(dims[0], dims[1], bias=False)
+        self.norm = nn.LayerNorm(dims[-1])
+        self.act = nn.GELU()
 
     def route(self, x, neighbor_ind=None):
         # x: (b, n, d)
@@ -65,6 +71,7 @@ class EdgeConv(nn.Module):
 
         x = self.mlp(x)
         x = x.max(dim=2, keepdim=False)[0]  # (b, n, k, d) -> (b, n, d)
+        x = self.act(self.norm(x))
         return x
 
 
@@ -118,6 +125,7 @@ class DGCNN_Cls(nn.Module):
             emb_dim=1024,
             dynamic=True,
             dropout=0,
+            head_norm=True,  # if using batchnorm in head, disable it if the batch size is 1
     ):
         super().__init__()
         self.k = k
@@ -130,19 +138,22 @@ class DGCNN_Cls(nn.Module):
 
         self.mlp1 = nn.Sequential(
             nn.Linear(sum(dims[1:]), emb_dim, bias=False),
-            nn.LayerNorm(emb_dim),
-            nn.GELU(),
         )
 
         self.dropout = nn.Dropout(dropout) if dropout > 0 else nn.Identity()
 
-        self.mlp2 = nn.Sequential(
+        # BN is a linear operator on the feature space, whereas LN projects
+        # the feature space onto a (d-2)-dimensional sphere which the mlp
+        # head does not prefer.
+        norm = nn.BatchNorm1d if head_norm else nn.Identity
+        self.norm = norm(emb_dim * 2)
+        self.head = nn.Sequential(
             nn.Linear(emb_dim * 2, 512, bias=False),
-            nn.LayerNorm(512),
+            norm(512),
             nn.GELU(),
             nn.Dropout(dropout) if dropout > 0 else nn.Identity(),
             nn.Linear(512, 256, bias=False),
-            nn.LayerNorm(256),
+            norm(256),
             nn.GELU(),
             nn.Dropout(dropout) if dropout > 0 else nn.Identity(),
             nn.Linear(256, out_dim),
@@ -167,7 +178,7 @@ class DGCNN_Cls(nn.Module):
         x = torch.cat((x1, x2), dim=-1)  # (b, 2 * emb_dim)
 
         # mlp
-        x = self.mlp2(self.dropout(x))  # (b, 2 * emb_dim) -> (b, out_dim)
+        x = self.head(self.dropout(self.norm(x)))  # (b, 2 * emb_dim) -> (b, out_dim)
 
         return x
 
