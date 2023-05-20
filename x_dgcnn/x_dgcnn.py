@@ -58,37 +58,37 @@ class SpatialTransformNet(nn.Module):
     Spatial transformer network
     """
 
-    def __init__(self, k, dims=(3, 64, 128)):
+    def __init__(self, k, dims=(3, 64, 128), head_bn=True):
         super().__init__()
         self.k = k
 
         self.block = EdgeConv(k=k, dims=dims)
 
-        self.mlp1 = nn.Sequential(
-            nn.Linear(dims[-1], 1024, bias=False),
-            nn.LayerNorm(1024),
-            nn.GELU(),
-        )
+        norm = nn.BatchNorm1d if head_bn else nn.LayerNorm
+        self.lin = nn.Linear(dims[-1], 1024, bias=False)
 
-        self.mlp2 = nn.Sequential(
+        self.norm = norm(1024)
+        self.act = nn.GELU()
+
+        self.head = nn.Sequential(
             nn.Linear(1024, 256, bias=False),
-            nn.LayerNorm(256),
+            norm(256),
             nn.GELU(),
+            nn.Linear(256, 9)
         )
 
-        self.transform = nn.Linear(256, 9)
-        torch.nn.init.constant_(self.transform.weight, 0)
-        torch.nn.init.eye_(self.transform.bias.view(3, 3))
+        torch.nn.init.constant_(self.head[-1].weight, 0)
+        torch.nn.init.eye_(self.head[-1].bias.view(3, 3))
 
     def forward(self, x):
         # x: (b, n, d)
         x = self.block(x)  # (b, n, d) -> (b, n, d)
-        x = self.mlp1(x)  # (b, n, d) -> (b, n, 1024)
-        x = x.max(dim=1, keepdim=False)[0]  # (b, n, 1024) -> (b, 1024)
-        x = self.mlp2(x)  # (b, 1024) -> (b, 1024)
 
-        x = self.transform(x)  # (b, 256) -> (b, 9)
-        x = x.reshape(-1, 3, 3)  # (b, 9) -> (b, 3, 3)
+        x = self.lin(x)  # (b, n, d) -> (b, n, 1024)
+        x = x.max(dim=1, keepdim=False)[0]  # (b, n, 1024) -> (b, 1024)
+        x = self.act(self.norm(x))
+
+        x = self.head(x)  # (b, 1024) -> (b, 9)
         return x
 
 
@@ -103,7 +103,7 @@ class DGCNN_Cls(nn.Module):
             emb_dim=1024,
             dynamic=True,
             dropout=0,
-            head_norm=True,  # if using batchnorm in head, disable it if the batch size is 1
+            head_bn=True,  # if using batchnorm in head, disable it if the batch size is 1
     ):
         super().__init__()
         self.k = k
@@ -114,16 +114,14 @@ class DGCNN_Cls(nn.Module):
             [EdgeConv(k=k, dims=(di, do)) for di, do in zip(dims[:-1], dims[1:])]
         )
 
-        self.mlp1 = nn.Sequential(
-            nn.Linear(sum(dims[1:]), emb_dim, bias=False),
-        )
+        self.lin = nn.Linear(sum(dims[1:]), emb_dim, bias=False)
 
         self.dropout = nn.Dropout(dropout) if dropout > 0 else nn.Identity()
 
         # BN is a linear operator on the feature space, whereas LN projects
         # the feature space onto a (d-2)-dimensional sphere which the mlp
         # head does not prefer.
-        norm = nn.BatchNorm1d if head_norm else nn.Identity
+        norm = nn.BatchNorm1d if head_bn else nn.LayerNorm
         self.norm = norm(emb_dim * 2)
         self.head = nn.Sequential(
             nn.Linear(emb_dim * 2, 512, bias=False),
@@ -150,7 +148,7 @@ class DGCNN_Cls(nn.Module):
         x = torch.cat(xs, dim=-1)  # (b, n, sum(dims))
 
         # max & mean pooling
-        x = self.mlp1(x)  # (b, n, sum(dims)) -> (b, n, emb_dim)
+        x = self.lin(x)  # (b, n, sum(dims)) -> (b, n, emb_dim)
         x1 = x.max(dim=1, keepdim=False)[0]  # (b, n, emb_dim) -> (b, emb_dim)
         x2 = x.mean(dim=1, keepdim=False)  # (b, n, emb_dim) -> (b, emb_dim)
         x = torch.cat((x1, x2), dim=-1)  # (b, 2 * emb_dim)
