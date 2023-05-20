@@ -2,8 +2,12 @@
 
 # x_dgcnn
 
-An optimized [DGCNN](https://arxiv.org/abs/1801.07829) based
-on [antao97's dgcnn.pytorch](https://github.com/antao97/dgcnn.pytorch).
+A pytorch implementation of [DGCNN](https://arxiv.org/abs/1801.07829), more efficient and memory-saving than
+[dgcnn.pytorch](https://github.com/antao97/dgcnn.pytorch).
+
+Update: use LayerNorm and GELU other than BatchNorm and ReLU, except for the head which is using BatchNorm or
+InstanceNorm for fast convergence. Rewrite the message passing part to make it more efficient. Move the normalization
+and activation after the max pooling in all instances. Make the categorical embedding learnable.
 
 [![PyPI version](https://badge.fury.io/py/x-dgcnn.svg)](https://badge.fury.io/py/x-dgcnn)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -34,7 +38,7 @@ Part segmentation.
 import torch
 from x_dgcnn import DGCNN_Seg
 
-model = DGCNN_Seg(k=64, in_dim=3, out_dim=10, n_category=10)
+model = DGCNN_Seg(k=64, in_dim=3, out_dim=10, n_category=10, use_stn=True)
 x = torch.randn(8, 2048, 3)
 xyz = x
 category = torch.randint(0, 10, (20,))
