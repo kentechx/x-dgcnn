@@ -10,24 +10,9 @@ def exists(val):
     return val is not None
 
 
-def pairwise_dists(x, y=None):
-    # x: (b, n, d)
-    # y: (b, m, d) or None
-    if exists(y):
-        xty = -2 * einsum(x, y, 'b n d, b m d -> b n m')
-        xx = reduce(x ** 2, 'b n d -> b n 1', 'sum')
-        yy = reduce(y ** 2, 'b m d -> b 1 m', 'sum')
-        pair_dists = xx + xty + yy  # (b, n, m)
-    else:
-        inner = -2 * einsum(x, x, 'b n d, b m d -> b n m')
-        xx = reduce(x ** 2, 'b n d -> b n 1', 'sum')
-        pair_dists = xx + inner + xx.transpose(2, 1)  # (b, n, m)
-    return pair_dists
-
-
 def knn(x, k):
     # x: (b, n, d)
-    neg_pdists = -1. * pairwise_dists(x)
+    neg_pdists = -1. * torch.cdist(x, x)
     topk_ind = neg_pdists.topk(k=k, dim=-1)[1]  # (batch_size, num_points, k)
     return topk_ind
 
