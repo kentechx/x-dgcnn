@@ -85,7 +85,10 @@ class SpatialTransformNet(nn.Module):
         self.act = nn.GELU()
 
         self.head = nn.Sequential(
-            nn.Linear(1024, 256, bias=False),
+            nn.Linear(1024, 512, bias=False),
+            norm(512),
+            nn.GELU(),
+            nn.Linear(512, 256, bias=False),
             norm(256),
             nn.GELU(),
             nn.Linear(256, 9)
@@ -223,10 +226,13 @@ class DGCNN_Seg(nn.Module):
             InstanceNorm1d(256),
             nn.GELU(),
             nn.Dropout(dropout) if dropout > 0 else nn.Identity(),
+            nn.Linear(256, 256, bias=False),
+            InstanceNorm1d(256),
+            nn.GELU(),
+            nn.Dropout(dropout) if dropout > 0 else nn.Identity(),
             nn.Linear(256, 128, bias=False),
             InstanceNorm1d(128),
             nn.GELU(),
-            nn.Dropout(dropout) if dropout > 0 else nn.Identity(),
             nn.Linear(128, out_dim),
         )
 
