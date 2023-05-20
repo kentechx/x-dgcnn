@@ -1,4 +1,4 @@
-from x_dgcnn.x_dgcnn import (
+from x_dgcnn.dgcnn import (
     EdgeConv,
     SpatialTransformNet,
     DGCNN_Cls,
