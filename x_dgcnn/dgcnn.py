@@ -94,9 +94,9 @@ class SpatialTransformNet(nn.Module):
         torch.nn.init.constant_(self.head[-1].weight, 0)
         torch.nn.init.eye_(self.head[-1].bias.view(3, 3))
 
-    def forward(self, x):
+    def forward(self, x, neighbor_ind=None):
         # x: (b, n, d)
-        x = self.block(x)  # (b, n, d) -> (b, n, d)
+        x = self.block(x, neighbor_ind)  # (b, n, d) -> (b, n, d)
 
         x = self.lin(x)  # (b, n, d) -> (b, n, 1024)
         x = x.max(dim=1, keepdim=False)[0]  # (b, n, 1024) -> (b, 1024)
