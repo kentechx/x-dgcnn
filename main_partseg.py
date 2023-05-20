@@ -156,7 +156,7 @@ def train(args, io):
     if args.model == 'dgcnn':
         model = DGCNN_partseg(args, seg_num_all).to(device)
     elif args.model == 'xdgcnn_dgcnn':
-        model = x_dgcnn.DGCNN_Seg(k=args.k, in_dim=3, out_dim=seg_num_all, n_category=16, dropout=args.dropout,).to(device)
+        model = x_dgcnn.DGCNN_Seg(k=args.k, in_dim=3, out_dim=seg_num_all, n_category=16, dropout=args.dropout, use_stn=True).to(device)
     else:
         raise Exception("Not implemented")
     print(str(model))
@@ -313,7 +313,7 @@ def test(args, io):
     if args.model == 'dgcnn':
         model = DGCNN_partseg(args, seg_num_all).to(device)
     elif args.model == 'xdgcnn_dgcnn':
-        model = x_dgcnn.DGCNN_Seg(k=args.k, in_dim=3, out_dim=seg_num_all, n_category=16, dropout=args.dropout,).to(device)
+        model = x_dgcnn.DGCNN_Seg(k=args.k, in_dim=3, out_dim=seg_num_all, n_category=16, dropout=args.dropout, use_stn=True).to(device)
     else:
         raise Exception("Not implemented")
 
