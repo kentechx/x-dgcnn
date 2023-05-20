@@ -10,6 +10,20 @@ def exists(val):
     return val is not None
 
 
+class InstanceNorm1d(nn.Module):  # instance norm, done in the last dimension
+
+    def __init__(self, dim, eps=1e-5):
+        super().__init__()
+        self.eps = eps
+        self.g = nn.Parameter(torch.ones(1, 1, dim))
+        self.b = nn.Parameter(torch.zeros(1, 1, dim))
+
+    def forward(self, x):
+        var = x.var(dim=1, unbiased=False, keepdim=True)
+        mean = x.mean(dim=1, keepdim=True)
+        return self.g * (x - mean) / (var + self.eps) ** 0.5 + self.b
+
+
 class EdgeConv(nn.Module):
     def __init__(self, k, dims=(64, 64)):
         super().__init__()
@@ -190,24 +204,21 @@ class DGCNN_Seg(nn.Module):
             self.blocks.append(EdgeConv(k=k, dims=(64, 64, 64)))
         self.blocks.append(EdgeConv(k=k, dims=(64, 64)))
 
-        # mlp1
-        self.mlp1 = nn.Sequential(
-            nn.Linear(depth * 64, emb_dim, bias=False),
-            nn.LayerNorm(emb_dim),
-            nn.GELU(),
-        )
-
+        # global linear
+        self.lin = nn.Linear(depth * 64, emb_dim, bias=False)
+        self.norm = nn.LayerNorm(emb_dim)
+        self.act = nn.GELU()
         self.dropout = nn.Dropout(dropout) if dropout > 0 else nn.Identity()
 
-        # mlp2
+        # head
         dim = emb_dim + depth * 64 + (category_dim if n_category > 0 else 0)
-        self.mlp2 = nn.Sequential(
+        self.head = nn.Sequential(
             nn.Linear(dim, 256, bias=False),
-            nn.LayerNorm(256),
+            InstanceNorm1d(256),
             nn.GELU(),
             nn.Dropout(dropout) if dropout > 0 else nn.Identity(),
             nn.Linear(256, 128, bias=False),
-            nn.LayerNorm(128),
+            InstanceNorm1d(128),
             nn.GELU(),
             nn.Dropout(dropout) if dropout > 0 else nn.Identity(),
             nn.Linear(128, out_dim),
@@ -226,14 +237,14 @@ class DGCNN_Seg(nn.Module):
         x = torch.cat(xs, dim=-1)  # (b, n, depth * 64)
 
         # global feature
-        x = self.mlp1(x)  # (b, n, d2) -> (b, n, emb_dim)
+        x = self.lin(x)  # (b, n, d2) -> (b, n, emb_dim)
         x = x.max(1)[0]  # (b, n, emb_dim) -> (b, emb_dim)
-        x = self.dropout(x)  # (b, emb_dim)
+        x = self.dropout(self.act(self.norm(x)))  # (b, emb_dim)
         if exists(category):
             x = torch.cat((x, self.category_emb(category)), dim=-1)
 
         # local feature
         x = repeat(x, 'b d -> b n d', n=n)  # (b, emb_dim) -> (b, n, emb_dim)
         x = torch.cat((x, *xs), dim=-1)  # (b, n, emb_dim + depth * 64)
-        x = self.mlp2(x)  # (b, n, emb_dim + depth * 64) -> (b, n, out_dim)
+        x = self.head(x)  # (b, n, emb_dim + depth * 64) -> (b, n, out_dim)
         return x
