@@ -184,16 +184,22 @@ class DGCNN_Seg(nn.Module):
             n_category=0,
             category_dim=64,
             depth=3,
+            use_stn=False,
             dynamic=True,
             dropout=0,
     ):
         super().__init__()
         self.k = k
         self.dynamic = dynamic
+        self.use_stn = use_stn
 
         # category embedding
         if n_category > 0:
             self.category_emb = nn.Embedding(n_category, category_dim)
+
+        # if using stn, put other features behind xyz
+        if self.use_stn:
+            self.stn = SpatialTransformNet(k=k, dims=(in_dim, 64, 128))
 
         # EdgeConv blocks
         assert depth >= 2, 'depth must be >= 2'
@@ -229,6 +235,14 @@ class DGCNN_Seg(nn.Module):
         # xyz: (b, n, 3), spatial coordinates
         n = x.size(1)
         neighbor_ind = torch.cdist(xyz, xyz).topk(self.k, dim=-1, largest=False)[1]  # (b, n, k)
+
+        if self.use_stn:
+            transform = self.stn(x, neighbor_ind).reshape(-1, 3, 3)
+            if x.size(2) > 3:
+                x = torch.cat([torch.bmm(x[:, :, :3], transform), x[:, :, 3:]], dim=-1)
+            else:
+                assert x.size(2) == 3
+                x = torch.bmm(x, transform)
 
         xs = [self.blocks[0](x, neighbor_ind)]
         for block in self.blocks[1:]:
