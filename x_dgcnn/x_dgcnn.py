@@ -10,13 +10,6 @@ def exists(val):
     return val is not None
 
 
-def knn(x, k):
-    # x: (b, n, d)
-    neg_pdists = -1. * torch.cdist(x, x)
-    topk_ind = neg_pdists.topk(k=k, dim=-1)[1]  # (batch_size, num_points, k)
-    return topk_ind
-
-
 class EdgeConv(nn.Module):
     def __init__(self, k, dims=(64, 64)):
         super().__init__()
@@ -40,7 +33,7 @@ class EdgeConv(nn.Module):
         # x: (b, n, d)
         d = x.shape[-1]
         if not exists(neighbor_ind):
-            neighbor_ind = knn(x, k=self.k)  # (b, n, k)
+            neighbor_ind = torch.cdist(x, x).topk(self.k, dim=-1, largest=False)[1]  # (b, n, k)
 
         x = repeat(x, 'b n d -> b n k d', k=self.k)
         neighbor_ind = repeat(neighbor_ind, 'b n k -> b n k d', d=d)
@@ -147,7 +140,7 @@ class DGCNN_Cls(nn.Module):
     def forward(self, x, xyz):
         # x: (b, n, d)
         # xyz: (b, n, 3), spatial coordinates
-        neighbor_ind = knn(xyz, k=self.k)  # (b, n, k)
+        neighbor_ind = torch.cdist(xyz, xyz).topk(self.k, dim=-1, largest=False)[1]  # (b, n, k)
 
         # go through all EdgeConv blocks
         xs = [self.blocks[0](x, neighbor_ind)]
@@ -226,7 +219,7 @@ class DGCNN_Seg(nn.Module):
         # x: (b, n, d)
         # xyz: (b, n, 3), spatial coordinates
         n = x.size(1)
-        neighbor_ind = knn(xyz, k=self.k)  # (b, n, k)
+        neighbor_ind = torch.cdist(xyz, xyz).topk(self.k, dim=-1, largest=False)[1]  # (b, n, k)
 
         xs = [self.blocks[0](x, neighbor_ind)]
         for block in self.blocks[1:]:
