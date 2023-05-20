@@ -71,8 +71,8 @@ can handle a batch size of 32 (~17G GPU memory used).
 |      DGCNN (dgcnn.pytorch, 1024 points)      |      89.3      |    91.9     |
 |         DGCNN (x-dgcnn, 1024 points)         |    **90.1**    |  **92.6**   |
 | DGCNN (dgcnn.pytorch, 2048 points, batch 16) |      89.1      |    92.6     |
-|    DGCNN (x-dgcnn, 2048 points, batch 16)    |                |             |
-|    DGCNN (x-dgcnn, 2048 points, batch 32)    |      90.0      |    92.7     |
+|    DGCNN (x-dgcnn, 2048 points, batch 16)    |      89.3      |    92.7     |
+|    DGCNN (x-dgcnn, 2048 points, batch 32)    |    **90.0**    |  **92.7**   |
 
 &nbsp;
 
