@@ -23,6 +23,7 @@ from torch.utils.data import DataLoader
 from util import cal_loss, IOStream
 import sklearn.metrics as metrics
 from plyfile import PlyData, PlyElement
+import x_dgcnn
 
 global class_cnts
 class_indexs = np.zeros((16,), dtype=int)
@@ -86,11 +87,11 @@ def visualization(visu, visu_format, data, pred, seg, label, partseg_colors, cla
         if visu[0] != 'all':
             if len(visu) != 1:
                 if visu[0] != classname or visu[1] != str(class_index):
-                    skip = True 
+                    skip = True
                 else:
                     visual_warning = False
             elif visu[0] != classname:
-                skip = True 
+                skip = True
             else:
                 visual_warning = False
         elif class_choice != None:
@@ -99,7 +100,7 @@ def visualization(visu, visu_format, data, pred, seg, label, partseg_colors, cla
             visual_warning = False
         if skip:
             class_indexs[int(label[i])] = class_indexs[int(label[i])] + 1
-        else:  
+        else:
             if not os.path.exists('outputs/'+args.exp_name+'/'+'visualization'+'/'+classname):
                 os.makedirs('outputs/'+args.exp_name+'/'+'visualization'+'/'+classname)
             for j in range(0, data.shape[2]):
@@ -117,8 +118,8 @@ def visualization(visu, visu_format, data, pred, seg, label, partseg_colors, cla
             filepath = 'outputs/'+args.exp_name+'/'+'visualization'+'/'+classname+'/'+classname+'_'+str(class_index)+'_pred_'+IoU+'.'+visu_format
             filepath_gt = 'outputs/'+args.exp_name+'/'+'visualization'+'/'+classname+'/'+classname+'_'+str(class_index)+'_gt.'+visu_format
             if visu_format=='txt':
-                np.savetxt(filepath, xyzRGB, fmt='%s', delimiter=' ') 
-                np.savetxt(filepath_gt, xyzRGB_gt, fmt='%s', delimiter=' ') 
+                np.savetxt(filepath, xyzRGB, fmt='%s', delimiter=' ')
+                np.savetxt(filepath_gt, xyzRGB_gt, fmt='%s', delimiter=' ')
                 print('TXT visualization file saved in', filepath)
                 print('TXT visualization file saved in', filepath_gt)
             elif visu_format=='ply':
@@ -144,9 +145,9 @@ def train(args, io):
     else:
         drop_last = True
     train_loader = DataLoader(train_dataset, num_workers=8, batch_size=args.batch_size, shuffle=True, drop_last=drop_last)
-    test_loader = DataLoader(ShapeNetPart(partition='test', num_points=args.num_points, class_choice=args.class_choice), 
+    test_loader = DataLoader(ShapeNetPart(partition='test', num_points=args.num_points, class_choice=args.class_choice),
                             num_workers=8, batch_size=args.test_batch_size, shuffle=True, drop_last=False)
-    
+
     device = torch.device("cuda" if args.cuda else "cpu")
 
     #Try to load models
@@ -154,6 +155,8 @@ def train(args, io):
     seg_start_index = train_loader.dataset.seg_start_index
     if args.model == 'dgcnn':
         model = DGCNN_partseg(args, seg_num_all).to(device)
+    elif args.model == 'xdgcnn_dgcnn':
+        model = x_dgcnn.DGCNN_Seg(k=args.k, in_dim=3, out_dim=seg_num_all, n_category=16, dropout=args.dropout,).to(device)
     else:
         raise Exception("Not implemented")
     print(str(model))
@@ -198,7 +201,12 @@ def train(args, io):
             data = data.permute(0, 2, 1)
             batch_size = data.size()[0]
             opt.zero_grad()
-            seg_pred = model(data, label_one_hot)
+            if args.model == 'xdgcnn_dgcnn':
+                seg_pred = model(data.transpose(1, 2).contiguous(),
+                                 data.transpose(1, 2).clone(),
+                                 label_one_hot.argmax(-1)).transpose(1, 2).contiguous()
+            else:
+                seg_pred = model(data, label_one_hot)
             seg_pred = seg_pred.permute(0, 2, 1).contiguous()
             loss = criterion(seg_pred.view(-1, seg_num_all), seg.view(-1,1).squeeze())
             loss.backward()
@@ -256,7 +264,12 @@ def train(args, io):
             data, label_one_hot, seg = data.to(device), label_one_hot.to(device), seg.to(device)
             data = data.permute(0, 2, 1)
             batch_size = data.size()[0]
-            seg_pred = model(data, label_one_hot)
+            if args.model == 'xdgcnn_dgcnn':
+                seg_pred = model(data.transpose(1, 2).contiguous(),
+                                 data.transpose(1, 2).clone(),
+                                 label_one_hot.argmax(-1)).transpose(1, 2).contiguous()
+            else:
+                seg_pred = model(data, label_one_hot)
             seg_pred = seg_pred.permute(0, 2, 1).contiguous()
             loss = criterion(seg_pred.view(-1, seg_num_all), seg.view(-1,1).squeeze())
             pred = seg_pred.max(dim=2)[1]
@@ -299,6 +312,8 @@ def test(args, io):
     partseg_colors = test_loader.dataset.partseg_colors
     if args.model == 'dgcnn':
         model = DGCNN_partseg(args, seg_num_all).to(device)
+    elif args.model == 'xdgcnn_dgcnn':
+        model = x_dgcnn.DGCNN_Seg(k=args.k, in_dim=3, out_dim=seg_num_all, n_category=16, dropout=args.dropout,).to(device)
     else:
         raise Exception("Not implemented")
 
@@ -321,7 +336,12 @@ def test(args, io):
         data, label_one_hot, seg = data.to(device), label_one_hot.to(device), seg.to(device)
         data = data.permute(0, 2, 1)
         batch_size = data.size()[0]
-        seg_pred = model(data, label_one_hot)
+        if args.model == 'xdgcnn_dgcnn':
+            seg_pred = model(data.transpose(1, 2).contiguous(),
+                             data.transpose(1, 2).clone(),
+                             label_one_hot.argmax(-1)).transpose(1, 2).contiguous()
+        else:
+            seg_pred = model(data, label_one_hot)
         seg_pred = seg_pred.permute(0, 2, 1).contiguous()
         pred = seg_pred.max(dim=2)[1]
         seg_np = seg.cpu().numpy()
@@ -332,7 +352,7 @@ def test(args, io):
         test_pred_seg.append(pred_np)
         test_label_seg.append(label.reshape(-1))
         # visiualization
-        visualization(args.visu, args.visu_format, data, pred, seg, label, partseg_colors, args.class_choice) 
+        visualization(args.visu, args.visu_format, data, pred, seg, label, partseg_colors, args.class_choice)
     if visual_warning and args.visu != '':
         print('Visualization Failed: You can only choose a point cloud shape to visualize within the scope of the test class')
     test_true_cls = np.concatenate(test_true_cls)
@@ -355,7 +375,7 @@ if __name__ == "__main__":
     parser.add_argument('--exp_name', type=str, default='exp', metavar='N',
                         help='Name of the experiment')
     parser.add_argument('--model', type=str, default='dgcnn', metavar='N',
-                        choices=['dgcnn'],
+                        choices=['dgcnn', 'xdgcnn_dgcnn'],
                         help='Model to use, [dgcnn]')
     parser.add_argument('--dataset', type=str, default='shapenetpart', metavar='N',
                         choices=['shapenetpart'])
