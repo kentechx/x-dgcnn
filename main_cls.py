@@ -95,7 +95,7 @@ def train(args, io):
             batch_size = data.size()[0]
             opt.zero_grad()
             if args.model == 'xdgcnn_dgcnn':
-                logits = model(data.transpose(1, 2).contiguous(), data.transpose(1, 2).clone())
+                logits = model(data, data.clone())
             else:
                 logits = model(data)
             loss = criterion(logits, label)
@@ -138,7 +138,7 @@ def train(args, io):
             data = data.permute(0, 2, 1)
             batch_size = data.size()[0]
             if args.model == 'xdgcnn_dgcnn':
-                logits = model(data.transpose(1, 2).contiguous(), data.transpose(1, 2).clone())
+                logits = model(data, data)
             else:
                 logits = model(data)
             loss = criterion(logits, label)
@@ -190,7 +190,7 @@ def test(args, io):
         data = data.permute(0, 2, 1)
         batch_size = data.size()[0]
         if args.model == 'xdgcnn_dgcnn':
-            logits = model(data.transpose(1, 2).contiguous(), data.transpose(1, 2).clone())
+            logits = model(data, data.clone())
         else:
             logits = model(data)
         preds = logits.max(dim=1)[1]
