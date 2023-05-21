@@ -3,8 +3,6 @@
 This is the experimental code for comparing the performance of DGCNN and XDGCNN.
 The code is based on the [dgcnn.pytorch](https://github.com/antao97/dgcnn.pytorch).
 
-The following experiments are all conducted on a single NVIDIA RTX 3090 GPU card.
-
 ## Requirements
 
 - Python >= 3.7
@@ -60,7 +58,7 @@ python main_cls.py --exp_name=cls_2048_dgcnn_eval --num_points=2048 --k=40 --eva
 
 ### Performance:
 
-ModelNet40 dataset
+ModelNet40 dataset (1 NVIDIA 3090 GPU)
 
 Please note that the implementation in [dgcnn.pytorch](https://github.com/antao97/dgcnn.pytorch) consumes more GPU
 memory, allowing us to only use a batch size of 16 for 2048 points on a single 3090 GPU. In contrast, our implementation
@@ -116,13 +114,14 @@ python main_partseg.py --exp_name=partseg_airplane_eval --class_choice=airplane 
 
 ### Performance:
 
-ShapeNet part dataset
+ShapeNet part dataset (4 NVIDIA 3090 GPUs)
 
-|           | Mean IoU | Airplane |   Bag    |   Cap    |   Car    |  Chair   | Earphone |  Guitar  |  Knife   |   Lamp   |  Laptop  |  Motor   |   Mug    |  Pistol  |  Rocket  | Skateboard |  Table   
-|:---------:|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|:----------:|:--------:| 
-|  Shapes   |          |   2690   |    76    |    55    |   898    |   3758   |    69    |   787    |   392    |   1547   |   451    |   202    |   184    |   283    |    66    |    152     |   5271   | 
-|   Paper   | **85.2** |   84.0   | **83.4** | **86.7** |   77.8   |   90.6   |   74.7   |   91.2   | **87.5** |   82.8   | **95.7** |   66.3   | **94.9** |   81.1   | **63.5** |    74.5    |   82.6   |
-| This repo | **85.2** | **84.5** |   80.3   |   84.7   | **79.8** | **91.1** | **76.8** | **92.0** |   87.3   | **83.8** | **95.7** | **69.6** |   94.3   | **83.7** |   51.5   |  **76.1**  | **82.8** |
+|                 | Mean IoU | Airplane |   Bag    |   Cap    |   Car    |  Chair   | Earphone |  Guitar  |  Knife   |   Lamp   |  Laptop  |  Motor   |   Mug    |  Pistol  |  Rocket  | Skateboard |  Table   
+|:---------------:|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|:----------:|:--------:| 
+|     Shapes      |          |   2690   |    76    |    55    |   898    |   3758   |    69    |   787    |   392    |   1547   |   451    |   202    |   184    |   283    |    66    |    152     |   5271   | 
+|      Paper      |   85.2   |   84.0   | **83.4** | **86.7** |   77.8   |   90.6   |   74.7   |   91.2   | **87.5** |   82.8   | **95.7** |   66.3   | **94.9** |   81.1   | **63.5** |    74.5    |   82.6   |
+|  dgcnn.pytorch  | **85.4** | **85.2** |   81.9   |   85.1   | **79.6** | **91.2** | **75.0** | **92.1** |   86.9   | **84.1** | **96.1** | **71.2** |   94.7   | **84.0** |   49.1   |  **76.3**  | **82.7** |
+| DGCNN (x-dgcnn) |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |    ****    |          |
 
 ## Point Cloud Semantic Segmentation on the S3DIS Dataset
 
@@ -160,10 +159,11 @@ python main_semseg_s3dis.py --exp_name=semseg_s3dis_eval --test_area=all --eval=
 
 Stanford Large-Scale 3D Indoor Spaces Dataset (S3DIS) dataset
 
-|           | Mean IoU | Overall Acc |
-|:---------:|:--------:|:-----------:|
-|   Paper   |   56.1   |    84.1     |
-| This repo | **59.2** |  **85.0**   |
+|                 | Mean IoU | Overall Acc |
+|:---------------:|:--------:|:-----------:|
+|      Paper      |   56.1   |    84.1     |
+|  dgcnn.pytorch  | **59.2** |  **85.0**   |
+| DGCNN (x-dgcnn) |          |             |
 
 ## Point Cloud Semantic Segmentation on the ScanNet Dataset
 
@@ -229,15 +229,17 @@ evaluation.
 
 The validation set of the ScanNet Dataset
 
-|           | Mean IoU | wall | floor | cabinet | bed  | chair | sofa | table | door | window | bookshelf | picture | counter | desk | curtain | refrigerator | shower curtain | toilet | sink | bathtub | otherfurniture | 
-|:---------:|:--------:|:----:|:-----:|:-------:|:----:|:-----:|:----:|:-----:|:----:|:------:|:---------:|:-------:|:-------:|:----:|:-------:|:------------:|:--------------:|:------:|:----:|:-------:|:--------------:| 
-| This repo |   49.6   | 73.2 | 93.6  |  44.9   | 64.7 | 70.0  | 50.5 | 55.7  | 35.7 |  47.7  |   69.1    |  14.6   |  41.8   | 45.3 |  33.8   |     29.2     |      35.7      |  55.9  | 40.2 |  56.5   |      32.9      | 
+|                 | Mean IoU | wall | floor | cabinet | bed  | chair | sofa | table | door | window | bookshelf | picture | counter | desk | curtain | refrigerator | shower curtain | toilet | sink | bathtub | otherfurniture | 
+|:---------------:|:--------:|:----:|:-----:|:-------:|:----:|:-----:|:----:|:-----:|:----:|:------:|:---------:|:-------:|:-------:|:----:|:-------:|:------------:|:--------------:|:------:|:----:|:-------:|:--------------:| 
+|  dgcnn.pytorch  |   49.6   | 73.2 | 93.6  |  44.9   | 64.7 | 70.0  | 50.5 | 55.7  | 35.7 |  47.7  |   69.1    |  14.6   |  41.8   | 45.3 |  33.8   |     29.2     |      35.7      |  55.9  | 40.2 |  56.5   |      32.9      | 
+| DGCNN (x-dgcnn) |          |      |       |         |      |       |      |       |      |        |           |         |         |      |         |              |                |        |      |         |                |
 
 The testing set of the ScanNet Dataset
 
-|           | Mean IoU | wall | floor | cabinet | bed  | chair | sofa | table | door | window | bookshelf | picture | counter | desk | curtain | refrigerator | shower curtain | toilet | sink | bathtub | other furniture | 
-|:---------:|:--------:|:----:|:-----:|:-------:|:----:|:-----:|:----:|:-----:|:----:|:------:|:---------:|:-------:|:-------:|:----:|:-------:|:------------:|:--------------:|:------:|:----:|:-------:|:---------------:| 
-| This repo |   44.6   | 72.3 | 93.7  |  36.6   | 62.3 | 65.1  | 57.7 | 44.5  | 33.0 |  39.4  |   46.3    |  12.6   |  31.0   | 34.9 |  38.9   |     28.5     |      22.4      |  62.5  | 35.0 |  47.4   |      27.1       | 
+|                 | Mean IoU | wall | floor | cabinet | bed  | chair | sofa | table | door | window | bookshelf | picture | counter | desk | curtain | refrigerator | shower curtain | toilet | sink | bathtub | other furniture | 
+|:---------------:|:--------:|:----:|:-----:|:-------:|:----:|:-----:|:----:|:-----:|:----:|:------:|:---------:|:-------:|:-------:|:----:|:-------:|:------------:|:--------------:|:------:|:----:|:-------:|:---------------:| 
+|  dgcnn.pytorch  |   44.6   | 72.3 | 93.7  |  36.6   | 62.3 | 65.1  | 57.7 | 44.5  | 33.0 |  39.4  |   46.3    |  12.6   |  31.0   | 34.9 |  38.9   |     28.5     |      22.4      |  62.5  | 35.0 |  47.4   |      27.1       |
+| DGCNN (x-dgcnn) |          |      |       |         |      |       |      |       |      |        |           |         |         |      |         |              |                |        |      |         |                 |
 
 These is no official results of DGCNN on the ScanNet dataset. You can find our results on
 the [website](https://kaldir.vc.in.tum.de/scannet_benchmark/semantic_label_3d) as `DGCNN_reproduce`.
