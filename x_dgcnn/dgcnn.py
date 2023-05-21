@@ -23,20 +23,6 @@ def cdist(x, y=None):
         return torch.cdist(x, x)
 
 
-class InstanceNorm1d(nn.Module):  # instance norm, done in the last dimension
-
-    def __init__(self, dim, eps=1e-5):
-        super().__init__()
-        self.eps = eps
-        self.g = nn.Parameter(torch.ones(1, 1, dim))
-        self.b = nn.Parameter(torch.zeros(1, 1, dim))
-
-    def forward(self, x):
-        var = x.var(dim=1, unbiased=False, keepdim=True)
-        mean = x.mean(dim=1, keepdim=True)
-        return self.g * (x - mean) / (var + self.eps) ** 0.5 + self.b
-
-
 class EdgeConv(nn.Module):
     def __init__(self, k, dims=(64, 64)):
         super().__init__()
@@ -85,14 +71,14 @@ class SpatialTransformNet(nn.Module):
     Spatial transformer network
     """
 
-    def __init__(self, k, in_dim=3, head_bn=True):
+    def __init__(self, k, in_dim=3, head_norm=True):
         super().__init__()
         self.k = k
 
         dims = (in_dim, 64, 128)
         self.block = EdgeConv(k=k, dims=dims)
 
-        norm = nn.BatchNorm1d if head_bn else nn.LayerNorm
+        norm = nn.BatchNorm1d if head_norm else nn.Identity
         self.lin = nn.Conv1d(dims[-1], 1024, 1, bias=False)
 
         self.norm = norm(1024)
@@ -134,7 +120,7 @@ class DGCNN_Cls(nn.Module):
             emb_dim=1024,
             dynamic=True,
             dropout=0,
-            head_bn=True,  # if using batchnorm in head, disable it if the batch size is 1
+            head_norm=True,  # if using norm in head, disable it if the batch size is 1
     ):
         super().__init__()
         self.k = k
@@ -152,7 +138,7 @@ class DGCNN_Cls(nn.Module):
         # BN is a linear operator on the feature space, whereas LN projects
         # the feature space onto a (d-2)-dimensional sphere which the mlp
         # head does not prefer.
-        norm = nn.BatchNorm1d if head_bn else nn.LayerNorm
+        norm = nn.BatchNorm1d if head_bn else nn.Identity
         self.norm = norm(emb_dim * 2)
         self.head = nn.Sequential(
             nn.Linear(emb_dim * 2, 512, bias=False),
