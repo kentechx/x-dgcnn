@@ -10,6 +10,19 @@ def exists(val):
     return val is not None
 
 
+def cdist(x, y=None):
+    # perform cdist in dimension 1
+    # x: (b, d, n)
+    # y: (b, d, m)
+    if exists(y):
+        x = rearrange(x, 'b d n -> b n d')
+        y = rearrange(y, 'b d m -> b m d')
+        return torch.cdist(x, y)
+    else:
+        x = rearrange(x, 'b d n -> b n d')
+        return torch.cdist(x, x)
+
+
 class InstanceNorm1d(nn.Module):  # instance norm, done in the last dimension
 
     def __init__(self, dim, eps=1e-5):
@@ -32,37 +45,37 @@ class EdgeConv(nn.Module):
         dims = (dims[0] * 2, *dims[1:])
         if len(dims) > 2:
             self.mlp = nn.Sequential(*[
-                nn.Sequential(nn.Linear(in_d, out_d, bias=False),
-                              nn.LayerNorm(out_d),
+                nn.Sequential(nn.Conv2d(in_d, out_d, 1, bias=False),
+                              nn.BatchNorm2d(out_d),
                               nn.GELU())
                 for in_d, out_d in zip(dims[:-2], dims[1:-1])
             ])
-            self.mlp.append(nn.Linear(dims[-2], dims[-1], bias=False))
+            self.mlp.append(nn.Conv2d(dims[-2], dims[-1], 1, bias=False))
         else:
-            self.mlp = nn.Linear(dims[0], dims[1], bias=False)
-        self.norm = nn.LayerNorm(dims[-1])
+            self.mlp = nn.Conv2d(dims[0], dims[1], 1, bias=False)
+        self.norm = nn.BatchNorm1d(dims[-1])
         self.act = nn.GELU()
 
     def route(self, x, neighbor_ind=None):
-        # x: (b, n, d)
-        d = x.shape[-1]
+        # x: (b, d, n)
+        d = x.size(1)
         if not exists(neighbor_ind):
-            neighbor_ind = torch.cdist(x, x).topk(self.k, dim=-1, largest=False)[1]  # (b, n, k)
+            neighbor_ind = cdist(x).topk(self.k, dim=-1, largest=False)[1]  # (b, n, k)
 
-        x = repeat(x, 'b n d -> b n k d', k=self.k)
-        neighbor_ind = repeat(neighbor_ind, 'b n k -> b n k d', d=d)
-        neighbor_x = x.gather(1, neighbor_ind)  # (b, n, k, d)
+        x = repeat(x, 'b d n -> b d n k', k=self.k)
+        neighbor_ind = repeat(neighbor_ind, 'b n k -> b d n k', d=d)
+        neighbor_x = x.gather(2, neighbor_ind)  # (b, d, n, k)
 
-        # (b, n, k, d) -> (b, n, k, 2*d)
-        graph_feature = torch.cat([neighbor_x - x, x], dim=-1)
+        # (b, d, n, k) -> (b, 2*d, n, k)
+        graph_feature = torch.cat([neighbor_x - x, x], dim=1)
         return graph_feature
 
     def forward(self, x, neighbor_ind=None):
-        # x: (b, n, d)
-        x = self.route(x, neighbor_ind)  # (b, n, k, 2*d)
+        # x: (b, d, n)
+        x = self.route(x, neighbor_ind)  # (b, 2*d, n, k)
 
         x = self.mlp(x)
-        x = x.max(dim=2, keepdim=False)[0]  # (b, n, k, d) -> (b, n, d)
+        x = x.max(dim=-1, keepdim=False)[0]  # (b, d, n, k) -> (b, d, n)
         x = self.act(self.norm(x))
         return x
 
@@ -80,7 +93,7 @@ class SpatialTransformNet(nn.Module):
         self.block = EdgeConv(k=k, dims=dims)
 
         norm = nn.BatchNorm1d if head_bn else nn.LayerNorm
-        self.lin = nn.Linear(dims[-1], 1024, bias=False)
+        self.lin = nn.Conv1d(dims[-1], 1024, 1, bias=False)
 
         self.norm = norm(1024)
         self.act = nn.GELU()
@@ -99,11 +112,11 @@ class SpatialTransformNet(nn.Module):
         torch.nn.init.eye_(self.head[-1].bias.view(3, 3))
 
     def forward(self, x, neighbor_ind=None):
-        # x: (b, n, d)
-        x = self.block(x, neighbor_ind)  # (b, n, d) -> (b, n, d)
+        # x: (b, d, n)
+        x = self.block(x, neighbor_ind)  # (b, d, n) -> (b, d, n)
 
-        x = self.lin(x)  # (b, n, d) -> (b, n, 1024)
-        x = x.max(dim=1, keepdim=False)[0]  # (b, n, 1024) -> (b, 1024)
+        x = self.lin(x)  # (b, d, n) -> (b, 1024, n)
+        x = x.max(dim=-1, keepdim=False)[0]  # (b, 1024, n) -> (b, 1024)
         x = self.act(self.norm(x))
 
         x = self.head(x)  # (b, 1024) -> (b, 9)
@@ -132,7 +145,7 @@ class DGCNN_Cls(nn.Module):
             [EdgeConv(k=k, dims=(di, do)) for di, do in zip(dims[:-1], dims[1:])]
         )
 
-        self.lin = nn.Linear(sum(dims[1:]), emb_dim, bias=False)
+        self.lin = nn.Conv1d(sum(dims[1:]), emb_dim, 1, bias=False)
 
         self.dropout = nn.Dropout(dropout) if dropout > 0 else nn.Identity()
 
@@ -154,21 +167,21 @@ class DGCNN_Cls(nn.Module):
         )
 
     def forward(self, x, xyz):
-        # x: (b, n, d)
-        # xyz: (b, n, 3), spatial coordinates
-        neighbor_ind = torch.cdist(xyz, xyz).topk(self.k, dim=-1, largest=False)[1]  # (b, n, k)
+        # x: (b, d, n)
+        # xyz: (b, 3, n), spatial coordinates
+        neighbor_ind = cdist(xyz).topk(self.k, dim=-1, largest=False)[1]  # (b, n, k)
 
         # go through all EdgeConv blocks
         xs = [self.blocks[0](x, neighbor_ind)]
         for block in self.blocks[1:]:
             x = block(xs[-1], None if self.dynamic else neighbor_ind)
             xs.append(x)
-        x = torch.cat(xs, dim=-1)  # (b, n, sum(dims))
+        x = torch.cat(xs, dim=1)  # (b, sum(dims), n)
 
         # max & mean pooling
-        x = self.lin(x)  # (b, n, sum(dims)) -> (b, n, emb_dim)
-        x1 = x.max(dim=1, keepdim=False)[0]  # (b, n, emb_dim) -> (b, emb_dim)
-        x2 = x.mean(dim=1, keepdim=False)  # (b, n, emb_dim) -> (b, emb_dim)
+        x = self.lin(x)  # (b, sum(dims), n) -> (b, emb_dim, n)
+        x1 = x.max(dim=-1, keepdim=False)[0]  # (b, emb_dim, n) -> (b, emb_dim)
+        x2 = x.mean(dim=-1, keepdim=False)  # (b, emb_dim, n) -> (b, emb_dim)
         x = torch.cat((x1, x2), dim=-1)  # (b, 2 * emb_dim)
 
         # mlp
@@ -208,63 +221,63 @@ class DGCNN_Seg(nn.Module):
         self.blocks.append(EdgeConv(k=k, dims=(64, 64)))
 
         # global linear
-        self.lin = nn.Linear(depth * 64, emb_dim, bias=False)
-        self.norm = nn.LayerNorm(emb_dim)
+        self.lin = nn.Conv1d(depth * 64, emb_dim, 1, bias=False)
+        self.norm = nn.BatchNorm1d(emb_dim)
         self.act = nn.GELU()
         self.dropout = nn.Dropout(dropout) if dropout > 0 else nn.Identity()
 
         # head
         dim = emb_dim + depth * 64
         self.mlp = nn.Sequential(
-            nn.Linear(dim, 256, bias=False),
-            InstanceNorm1d(256),
+            nn.Conv1d(dim, 256, 1, bias=False),
+            nn.BatchNorm1d(256),
             nn.GELU(),
             nn.Dropout(dropout) if dropout > 0 else nn.Identity(),
-            nn.Linear(256, 256, bias=False),
-            InstanceNorm1d(256),
+            nn.Conv1d(256, 256, 1, bias=False),
+            nn.BatchNorm1d(256),
             nn.GELU(),
             nn.Dropout(dropout) if dropout > 0 else nn.Identity(),
-            nn.Linear(256, 128, bias=False),
-            InstanceNorm1d(128),
+            nn.Conv1d(256, 128, 1, bias=False),
+            nn.BatchNorm1d(128),
             nn.GELU(),
         )
 
         # category embedding
         if n_category > 0:
             self.category_emb = nn.Embedding(n_category, 128)
-        self.head = nn.Linear(128, out_dim)
+        self.head = nn.Conv1d(128, out_dim, 1)
 
     def forward(self, x, xyz, category=None):
-        # x: (b, n, d)
-        # xyz: (b, n, 3), spatial coordinates
-        n = x.size(1)
-        neighbor_ind = torch.cdist(xyz, xyz).topk(self.k, dim=-1, largest=False)[1]  # (b, n, k)
+        # x: (b, d, n)
+        # xyz: (b, 3, n), spatial coordinates
+        n = x.size(2)
+        neighbor_ind = cdist(xyz).topk(self.k, dim=-1, largest=False)[1]  # (b, n, k)
 
         if exists(self.stn):
             transform = self.stn(x, neighbor_ind).reshape(-1, 3, 3)
-            if x.size(2) > 3:
-                x = torch.cat([torch.bmm(x[:, :, :3], transform), x[:, :, 3:]], dim=-1)
+            if x.size(1) > 3:
+                x = torch.cat([torch.bmm(transform, x[:, :3]), x[:, 3:]], dim=1)
             else:
-                assert x.size(2) == 3
-                x = torch.bmm(x, transform)
+                assert x.size(1) == 3
+                x = torch.bmm(transform, x)
 
         xs = [self.blocks[0](x, neighbor_ind)]
         for block in self.blocks[1:]:
             x = block(xs[-1], None if self.dynamic else neighbor_ind)
             xs.append(x)
-        x = torch.cat(xs, dim=-1)  # (b, n, depth * 64)
+        x = torch.cat(xs, dim=1)  # (b, depth * 64, n)
 
         # global feature
-        x = self.lin(x)  # (b, n, d2) -> (b, n, emb_dim)
-        x = x.max(1)[0]  # (b, n, emb_dim) -> (b, emb_dim)
+        x = self.lin(x)  # (b, d2, n) -> (b, emb_dim, n)
+        x = x.max(-1)[0]  # (b, emb_dim, n) -> (b, emb_dim)
         x = self.dropout(self.act(self.norm(x)))  # (b, emb_dim)
 
         # local feature
-        x = repeat(x, 'b d -> b n d', n=n)  # (b, emb_dim) -> (b, n, emb_dim)
-        x = torch.cat((x, *xs), dim=-1)  # (b, n, emb_dim + depth * 64)
-        x = self.mlp(x)  # (b, n, emb_dim + depth * 64) -> (b, n, 128)
+        x = repeat(x, 'b d -> b d n', n=n)  # (b, emb_dim) -> (b, emb_dim, n)
+        x = torch.cat((x, *xs), dim=1)  # (b, emb_dim + depth * 64, n)
+        x = self.mlp(x)  # (b, emb_dim + depth * 64, n) -> (b, 128, n)
 
         if exists(category):
-            x = x + self.category_emb(category).unsqueeze(1)  # (b, n, 128) -> (b, n, 128)
-        x = self.head(x)  # (b, n, 128) -> (b, n, out_dim)
+            x = x + self.category_emb(category).unsqueeze(-1)  # (b, 128, n) -> (b, 128, n)
+        x = self.head(x)  # (b, 128, n) -> (b, out_dim, n)
         return x
