@@ -207,9 +207,7 @@ def train(args, io):
             batch_size = data.size()[0]
             opt.zero_grad()
             if args.model == 'xdgcnn_dgcnn':
-                seg_pred = model(data.transpose(1, 2).contiguous(),
-                                 data.transpose(1, 2).clone(),
-                                 label_one_hot.argmax(-1)).transpose(1, 2).contiguous()
+                seg_pred = model(data, data, label_one_hot.argmax(-1))
             else:
                 seg_pred = model(data, label_one_hot)
             seg_pred = seg_pred.permute(0, 2, 1).contiguous()
