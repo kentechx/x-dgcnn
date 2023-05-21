@@ -21,7 +21,7 @@ We try LayerNorm and InstanceNorm, and find that BatchNorm beats them by a large
 pip install x-dgcnn
 ```
 
-If you suffer from the error "No matching distribution found for x-dgcnn" using a mirror source, try the following
+If you suffer from the error `No matching distribution found for x-dgcnn` using a mirror source, try the following
 (if you know how to solve this problem, please open an issue):
 ```bash
 pip install x-dgcnn -i https://pypi.org/simple
