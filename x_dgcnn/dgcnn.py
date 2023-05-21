@@ -72,10 +72,11 @@ class SpatialTransformNet(nn.Module):
     Spatial transformer network
     """
 
-    def __init__(self, k, dims=(3, 64, 128), head_bn=True):
+    def __init__(self, k, in_dim=3, head_bn=True):
         super().__init__()
         self.k = k
 
+        dims = (in_dim, 64, 128)
         self.block = EdgeConv(k=k, dims=dims)
 
         norm = nn.BatchNorm1d if head_bn else nn.LayerNorm
@@ -85,10 +86,7 @@ class SpatialTransformNet(nn.Module):
         self.act = nn.GELU()
 
         self.head = nn.Sequential(
-            nn.Linear(1024, 512, bias=False),
-            norm(512),
-            nn.GELU(),
-            nn.Linear(512, 256, bias=False),
+            nn.Linear(1024, 256, bias=False),
             norm(256),
             nn.GELU(),
             nn.Linear(256, 9)
@@ -185,24 +183,17 @@ class DGCNN_Seg(nn.Module):
             out_dim,
             emb_dim=1024,
             n_category=0,
-            category_dim=64,
             depth=3,
-            use_stn=False,
+            stn: SpatialTransformNet = None,
             dynamic=True,
             dropout=0,
     ):
         super().__init__()
         self.k = k
         self.dynamic = dynamic
-        self.use_stn = use_stn
-
-        # category embedding
-        if n_category > 0:
-            self.category_emb = nn.Embedding(n_category, category_dim)
 
         # if using stn, put other features behind xyz
-        if self.use_stn:
-            self.stn = SpatialTransformNet(k=k, dims=(in_dim, 64, 128))
+        self.stn = stn
 
         # EdgeConv blocks
         assert depth >= 2, 'depth must be >= 2'
@@ -220,21 +211,22 @@ class DGCNN_Seg(nn.Module):
         self.dropout = nn.Dropout(dropout) if dropout > 0 else nn.Identity()
 
         # head
-        dim = emb_dim + depth * 64 + (category_dim if n_category > 0 else 0)
-        self.head = nn.Sequential(
+        dim = emb_dim + depth * 64
+        self.mlp = nn.Sequential(
             nn.Linear(dim, 256, bias=False),
-            InstanceNorm1d(256),
-            nn.GELU(),
-            nn.Dropout(dropout) if dropout > 0 else nn.Identity(),
-            nn.Linear(256, 256, bias=False),
             InstanceNorm1d(256),
             nn.GELU(),
             nn.Dropout(dropout) if dropout > 0 else nn.Identity(),
             nn.Linear(256, 128, bias=False),
             InstanceNorm1d(128),
             nn.GELU(),
-            nn.Linear(128, out_dim),
+            nn.Dropout(dropout) if dropout > 0 else nn.Identity(),
         )
+
+        # category embedding
+        if n_category > 0:
+            self.category_emb = nn.Embedding(n_category, 128)
+        self.head = nn.Linear(128, out_dim)
 
     def forward(self, x, xyz, category=None):
         # x: (b, n, d)
@@ -242,7 +234,7 @@ class DGCNN_Seg(nn.Module):
         n = x.size(1)
         neighbor_ind = torch.cdist(xyz, xyz).topk(self.k, dim=-1, largest=False)[1]  # (b, n, k)
 
-        if self.use_stn:
+        if exists(self.stn):
             transform = self.stn(x, neighbor_ind).reshape(-1, 3, 3)
             if x.size(2) > 3:
                 x = torch.cat([torch.bmm(x[:, :, :3], transform), x[:, :, 3:]], dim=-1)
@@ -260,11 +252,13 @@ class DGCNN_Seg(nn.Module):
         x = self.lin(x)  # (b, n, d2) -> (b, n, emb_dim)
         x = x.max(1)[0]  # (b, n, emb_dim) -> (b, emb_dim)
         x = self.dropout(self.act(self.norm(x)))  # (b, emb_dim)
-        if exists(category):
-            x = torch.cat((x, self.category_emb(category)), dim=-1)
 
         # local feature
         x = repeat(x, 'b d -> b n d', n=n)  # (b, emb_dim) -> (b, n, emb_dim)
         x = torch.cat((x, *xs), dim=-1)  # (b, n, emb_dim + depth * 64)
-        x = self.head(x)  # (b, n, emb_dim + depth * 64) -> (b, n, out_dim)
+        x = self.mlp(x)  # (b, n, emb_dim + depth * 64) -> (b, n, 128)
+
+        if exists(category):
+            x = x + self.category_emb(category).unsqueeze(1)  # (b, n, 128) -> (b, n, 128)
+        x = self.head(x)  # (b, n, 128) -> (b, n, out_dim)
         return x
