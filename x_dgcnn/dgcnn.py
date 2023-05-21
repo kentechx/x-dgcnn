@@ -138,7 +138,7 @@ class DGCNN_Cls(nn.Module):
         # BN is a linear operator on the feature space, whereas LN projects
         # the feature space onto a (d-2)-dimensional sphere which the mlp
         # head does not prefer.
-        norm = nn.BatchNorm1d if head_bn else nn.Identity
+        norm = nn.BatchNorm1d if head_norm else nn.Identity
         self.norm = norm(emb_dim * 2)
         self.head = nn.Sequential(
             nn.Linear(emb_dim * 2, 512, bias=False),
