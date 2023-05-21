@@ -20,15 +20,27 @@ pip install x-dgcnn
 
 ## Usage
 
+Classification.
+
+```python
+import torch
+from x_dgcnn import DGCNN_Cls
+model = DGCNN_Cls(k=20, in_dim=3, out_dim=10)
+x = torch.randn(8, 2048, 3)
+xyz = x.clone()
+out = model(x, xyz)
+
+```
+
 Semantic segmentation.
 
 ```python
 import torch
 from x_dgcnn import DGCNN_Seg
 
-model = DGCNN_Seg(k=64, in_dim=3, out_dim=10)
+model = DGCNN_Seg(k=40, in_dim=3, out_dim=10)
 x = torch.randn(8, 2048, 3)
-xyz = x
+xyz = x.clone()
 out = model(x, xyz)
 ```
 
@@ -36,11 +48,12 @@ Part segmentation.
 
 ```python
 import torch
-from x_dgcnn import DGCNN_Seg
+from x_dgcnn import DGCNN_Seg, SpatialTransformNet
 
-model = DGCNN_Seg(k=64, in_dim=3, out_dim=10, n_category=10, use_stn=True)
+stn = SpatialTransformNet(k=64)
+model = DGCNN_Seg(k=40, in_dim=3, out_dim=10, n_category=10, stn=stn)
 x = torch.randn(8, 2048, 3)
-xyz = x
+xyz = x.clone()
 category = torch.randint(0, 10, (20,))
 out = model(x, xyz, category)
 ```
