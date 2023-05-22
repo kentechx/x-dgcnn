@@ -1,7 +1,7 @@
 # set exp_name and class_choice
 exp_name=cls_dgcnn
 model=xdgcnn_dgcnn
-dropout=0.1
+dropout=0.5
 echo "exp_name: $exp_name"
 echo "model: $model"
 
