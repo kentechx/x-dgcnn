@@ -62,15 +62,15 @@ ModelNet40 dataset (1 NVIDIA 3090 GPU)
 
 Please note that the implementation in [dgcnn.pytorch](https://github.com/antao97/dgcnn.pytorch) consumes more GPU
 memory, allowing us to only use a batch size of 16 for 2048 points on a single 3090 GPU. In contrast, our implementation
-can handle a batch size of 32 (~17G GPU memory used).
+can handle a batch size of 32 (~20G GPU memory used).
 
 |                                              | Mean Class Acc | Overall Acc |
 |:--------------------------------------------:|:--------------:|:-----------:|
 |      DGCNN (dgcnn.pytorch, 1024 points)      |      89.3      |    91.9     |
 |         DGCNN (x-dgcnn, 1024 points)         |    **90.1**    |  **92.6**   |
 | DGCNN (dgcnn.pytorch, 2048 points, batch 16) |      89.1      |    92.6     |
-|    DGCNN (x-dgcnn, 2048 points, batch 16)    |      89.3      |    92.7     |
-|    DGCNN (x-dgcnn, 2048 points, batch 32)    |    **90.0**    |  **92.7**   |
+|    DGCNN (x-dgcnn, 2048 points, batch 16)    |    **90.1**    |  **93.0**   |
+|    DGCNN (x-dgcnn, 2048 points, batch 32)    |      89.5      |    92.8     |
 
 &nbsp;
 
@@ -115,13 +115,19 @@ python main_partseg.py --exp_name=partseg_airplane_eval --class_choice=airplane 
 ### Performance:
 
 ShapeNet part dataset (4 NVIDIA 3090 GPUs)
+In this experiment, since we add an additional dropout layer in after the max pooling,
+we reduce the dropout rate to 0.1. It reaches the best performance on the full dataset but lacks generalization
+on the subset dataset due to the overfitting problem (increasing dropout rate should help).
+
+Note that the variance of the dataset is high, especially for the small sub-dataset like bag and cap, which makes the
+evaluation results unstable.
 
 |                 | Mean IoU | Airplane |   Bag    |   Cap    |   Car    |  Chair   | Earphone |  Guitar  |  Knife   |   Lamp   |  Laptop  |  Motor   |   Mug    |  Pistol  |  Rocket  | Skateboard |  Table   
 |:---------------:|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|:----------:|:--------:| 
 |     Shapes      |          |   2690   |    76    |    55    |   898    |   3758   |    69    |   787    |   392    |   1547   |   451    |   202    |   184    |   283    |    66    |    152     |   5271   | 
-|      Paper      |   85.2   |   84.0   | **83.4** | **86.7** |   77.8   |   90.6   |   74.7   |   91.2   | **87.5** |   82.8   | **95.7** |   66.3   | **94.9** |   81.1   | **63.5** |    74.5    |   82.6   |
-|  dgcnn.pytorch  | **85.4** | **85.2** |   81.9   |   85.1   | **79.6** | **91.2** | **75.0** | **92.1** |   86.9   | **84.1** | **96.1** | **71.2** |   94.7   | **84.0** |   49.1   |  **76.3**  | **82.7** |
-| DGCNN (x-dgcnn) |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |            |          |
+|      Paper      |   85.2   |   84.0   | **83.4** | **86.7** |   77.8   |   90.6   |   74.7   |   91.2   | **87.5** |   82.8   |   95.7   |   66.3   | **94.9** |   81.1   | **63.5** |    74.5    |   82.6   |
+|  dgcnn.pytorch  |   85.4   | **85.2** |   81.9   |   85.1   |   79.6   |   91.2   | **75.0** | **92.1** |   86.9   | **84.1** | **96.1** | **71.2** |   94.7   | **84.0** |   49.1   |  **76.3**  | **82.7** |
+| DGCNN (x-dgcnn) | **85.6** |   84.8   |   80.4   |   80.9   | **79.9** | **91.3** |   74.1   |   91.2   |   85.8   |   82.9   |   95.8   |   70.4   |   94.8   |   82.1   |   49.3   |    71.2    | **82.7** |
 
 ## Point Cloud Semantic Segmentation on the S3DIS Dataset
 
