@@ -73,6 +73,7 @@ out = model(x, xyz, category)
 - [ ] Add differentiable subset operator and coordinate descent as another option to fuse features.
 - [ ] Scale up model size and test.
 - [ ] Add sampling to get hierarchical features.
+- [ ] Do tasks on other tasks, e.x. rotation prediction, normal prediction, etc.
 
 ## References
 
