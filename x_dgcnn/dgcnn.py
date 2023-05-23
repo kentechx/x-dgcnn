@@ -215,11 +215,11 @@ class DGCNN_Seg(nn.Module):
         # head
         dim = emb_dim + depth * 64
         self.mlp = nn.Sequential(
-            nn.Conv1d(dim, 256, 1, bias=False),
-            nn.BatchNorm1d(256),
+            nn.Conv1d(dim, 512, 1, bias=False),
+            nn.BatchNorm1d(512),
             nn.GELU(),
             nn.Dropout(dropout) if dropout > 0 else nn.Identity(),
-            nn.Conv1d(256, 256, 1, bias=False),
+            nn.Conv1d(512, 256, 1, bias=False),
             nn.BatchNorm1d(256),
             nn.GELU(),
             nn.Dropout(dropout) if dropout > 0 else nn.Identity(),
