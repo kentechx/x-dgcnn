@@ -62,7 +62,7 @@ from x_dgcnn import DGCNN_Seg, SpatialTransformNet
 
 # use stn and do part segmentation
 stn = SpatialTransformNet(k=40)
-model = DGCNN_Seg(k=40, in_dim=3, out_dim=4, n_category=10, stn=stn)
+model = DGCNN_Seg(k=40, in_dim=9, out_dim=4, n_category=10, stn=stn)
 x = torch.randn(8, 9, 2048)  # keep xyz at the first 3 channels if using stn
 xyz = x[:, :3].clone()
 category = torch.randint(0, 10, (10,))
