@@ -144,7 +144,7 @@ This task uses 6-fold training, such that 6 models are trained leaving 1 of 6 ar
 - Train in area 1-5
 
 ``` 
-python main_semseg_s3dis.py --exp_name=semseg_s3dis_6 --test_area=6 
+python main_semseg_s3dis.py --exp_name=semseg_s3dis_dgcnn --test_area=6 --model=xdgcnn_dgcnn --dropout=0.1
 ```
 
 ### Run the evaluation script after training finished:
@@ -152,13 +152,13 @@ python main_semseg_s3dis.py --exp_name=semseg_s3dis_6 --test_area=6
 - Evaluate in area 6 after the model is trained in area 1-5
 
 ``` 
-python main_semseg_s3dis.py --exp_name=semseg_s3dis_eval_6 --test_area=6 --eval=True --model_root=outputs/semseg_s3dis/models/
+python main_semseg_s3dis.py --exp_name=semseg_s3dis_dgcnn_eval_6 --test_area=6 --eval=True --model_root=outputs/semseg_s3dis_dgcnn/models/ --model=xdgcnn_dgcnn
 ```
 
 - Evaluate in all areas after 6 models are trained
 
 ``` 
-python main_semseg_s3dis.py --exp_name=semseg_s3dis_eval --test_area=all --eval=True --model_root=outputs/semseg_s3dis/models/
+python main_semseg_s3dis.py --exp_name=semseg_s3dis_dgcnn_eval --test_area=all --eval=True --model_root=outputs/semseg_s3dis_dgcnn/models/ --model=xdgcnn_dgcnn
 ```
 
 ### Performance:

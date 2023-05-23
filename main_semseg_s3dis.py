@@ -18,6 +18,7 @@ import torch.optim as optim
 from torch.optim.lr_scheduler import CosineAnnealingLR, StepLR
 from data import S3DIS
 from model import DGCNN_semseg_s3dis
+import x_dgcnn
 import numpy as np
 from torch.utils.data import DataLoader
 from util import cal_loss, IOStream
@@ -153,6 +154,11 @@ def train(args, io):
     #Try to load models
     if args.model == 'dgcnn':
         model = DGCNN_semseg_s3dis(args).to(device)
+    elif args.model == 'xdgcnn_dgcnn':
+        model = x_dgcnn.DGCNN_Seg(k=args.k,
+                                  in_dim=9,
+                                  out_dim=13,
+                                  dropout=args.dropout).to(device)
     else:
         raise Exception("Not implemented")
     print(str(model))
@@ -192,7 +198,10 @@ def train(args, io):
             data = data.permute(0, 2, 1)
             batch_size = data.size()[0]
             opt.zero_grad()
-            seg_pred = model(data)
+            if args.model == 'xdgcnn_dgcnn':
+                seg_pred = model(data, data[:, :3].clone())
+            else:
+                seg_pred = model(data)
             seg_pred = seg_pred.permute(0, 2, 1).contiguous()
             loss = criterion(seg_pred.view(-1, 13), seg.view(-1,1).squeeze())
             loss.backward()
@@ -242,7 +251,10 @@ def train(args, io):
             data, seg = data.to(device), seg.to(device)
             data = data.permute(0, 2, 1)
             batch_size = data.size()[0]
-            seg_pred = model(data)
+            if args.model == 'xdgcnn_dgcnn':
+                seg_pred = model(data, data[:, :3].clone())
+            else:
+                seg_pred = model(data)
             seg_pred = seg_pred.permute(0, 2, 1).contiguous()
             loss = criterion(seg_pred.view(-1, 13), seg.view(-1,1).squeeze())
             pred = seg_pred.max(dim=2)[1]
@@ -296,6 +308,11 @@ def test(args, io):
             semseg_colors = test_loader.dataset.semseg_colors
             if args.model == 'dgcnn':
                 model = DGCNN_semseg_s3dis(args).to(device)
+            elif args.model == 'xdgcnn_dgcnn':
+                model = x_dgcnn.DGCNN_Seg(k=args.k,
+                                          in_dim=9,
+                                          out_dim=13,
+                                          dropout=args.dropout).to(device)
             else:
                 raise Exception("Not implemented")
                 
@@ -312,7 +329,10 @@ def test(args, io):
                 data, seg = data.to(device), seg.to(device)
                 data = data.permute(0, 2, 1)
                 batch_size = data.size()[0]
-                seg_pred = model(data)
+                if args.model == 'xdgcnn_dgcnn':
+                    seg_pred = model(data, data[:, :3].clone())
+                else:
+                    seg_pred = model(data)
                 seg_pred = seg_pred.permute(0, 2, 1).contiguous()
                 pred = seg_pred.max(dim=2)[1] 
                 seg_np = seg.cpu().numpy()
@@ -363,7 +383,7 @@ if __name__ == "__main__":
     parser.add_argument('--exp_name', type=str, default='exp', metavar='N',
                         help='Name of the experiment')
     parser.add_argument('--model', type=str, default='dgcnn', metavar='N',
-                        choices=['dgcnn'],
+                        choices=['dgcnn', 'xdgcnn_dgcnn'],
                         help='Model to use, [dgcnn]')
     parser.add_argument('--dataset', type=str, default='S3DIS', metavar='N',
                         choices=['S3DIS'])
