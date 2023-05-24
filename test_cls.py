@@ -16,14 +16,15 @@ def seed_everything(seed=0):
 
 
 @click.command()
-@click.option('--model', type=str, default='dgcnn')
+@click.option('--model', type=str, default='xdgcnn')
 @click.option('--batch_size', type=int, default=32)
 @click.option('--n_points', type=int, default=1024)
 @click.option('--k', type=int, default=20)
 @click.option('--xdgcnn_k', default=4)
 @click.option('--sampling_ratio', type=tuple, default=(4, 16, 64, 256))
 @click.option('--device', default='cuda')
-def run(model, batch_size, n_points, k, xdgcnn_k, sampling_ratio, device):
+@click.option('--offline', is_flag=True, default=False)
+def run(model, batch_size, n_points, k, xdgcnn_k, sampling_ratio, device, offline):
     config = {'model': model,
               'batch_size': batch_size,
               'n_points': n_points,
@@ -40,7 +41,9 @@ def run(model, batch_size, n_points, k, xdgcnn_k, sampling_ratio, device):
     else:
         raise NotImplementedError
 
-    wandb.init(project='xdgcnn_random_test', name=config['model'], config=config)
+    wandb.init(project='xdgcnn_random_test', name=config['model'], config=config,
+               mode='online' if not offline else 'disabled'
+               )
 
     seed_everything(0)
 
