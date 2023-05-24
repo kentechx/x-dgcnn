@@ -69,7 +69,7 @@ def run(model, batch_size, n_points, k, xdgcnn_k, sampling_ratio, device, offlin
         optim.step()
 
         wandb.log({'loss': loss.item()})
-        bar.set_description(f'loss: {loss.item():.4f}')
+        bar.set_description(f'loss: {loss.item():.8f}')
 
     wandb.finish()
 
