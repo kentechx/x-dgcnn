@@ -210,7 +210,6 @@ class XDGCNN_Cls(nn.Module):
             head_norm=True,  # if using norm in head, disable it if the batch size is 1
     ):
         super().__init__()
-        self.k = k
 
         # projection
         self.mlp = nn.Sequential(
@@ -218,7 +217,9 @@ class XDGCNN_Cls(nn.Module):
             nn.BatchNorm1d(64),
             nn.GELU(),
         )
-        self.conv = XEdgeConv(16, dim=64)
+
+        self.first_k = 16
+        self.conv = XEdgeConv(self.first_k, dim=64)
 
         # stages
         blocks = [3, 3, 9, 3]
@@ -247,7 +248,7 @@ class XDGCNN_Cls(nn.Module):
     def forward(self, x, xyz):
         # x: (b, d, n)
         # xyz: (b, 3, n), spatial coordinates
-        neighbor_ind = cdist(xyz).topk(self.k, dim=-1, largest=False)[1]  # (b, n, k)
+        neighbor_ind = cdist(xyz).topk(self.first_k, dim=-1, largest=False)[1]  # (b, n, k)
         x = self.mlp(x)
         x = self.conv(x, neighbor_ind)
 
