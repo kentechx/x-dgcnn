@@ -218,10 +218,10 @@ class XDGCNN_Cls(nn.Module):
             nn.BatchNorm1d(64),
             nn.GELU(),
         )
-        self.conv = XEdgeConv(k, dim=64)
+        self.conv = XEdgeConv(16, dim=64)
 
         # stages
-        blocks = [1, 1, 1, 1]
+        blocks = [3, 3, 9, 3]
         n_points = [base_points // r for r in sampling_ratio]
         dims = [64, 128, 256, 512]
         stages = []
