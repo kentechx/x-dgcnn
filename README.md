@@ -168,8 +168,8 @@ Stanford Large-Scale 3D Indoor Spaces Dataset (S3DIS) dataset
 |                 | Mean IoU | Overall Acc |
 |:---------------:|:--------:|:-----------:|
 |      Paper      |   56.1   |    84.1     |
-|  dgcnn.pytorch  | **59.2** |  **85.0**   |
-| DGCNN (x-dgcnn) |          |             |
+|  dgcnn.pytorch  |   59.2   |    85.0     |
+| DGCNN (x-dgcnn) | **60.0** |  **85.2**   |
 
 ## Point Cloud Semantic Segmentation on the ScanNet Dataset
 
