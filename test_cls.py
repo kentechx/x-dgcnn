@@ -34,7 +34,7 @@ def run(model, batch_size, n_points, k, xdgcnn_k, sampling_ratio, device):
 
     if model == 'dgcnn':
         model = DGCNN_Cls(k=k, in_dim=3, out_dim=40).to(device)
-    elif model == 'x_dgcnn':
+    elif model == 'xdgcnn':
         model = XDGCNN_Cls(in_dim=3, out_dim=40,
                            base_points=n_points, sampling_ratio=sampling_ratio, k=xdgcnn_k).to(device)
     else:
