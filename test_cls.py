@@ -57,7 +57,7 @@ def run(model, batch_size, n_points, k, xdgcnn_k, sampling_ratio, device, offlin
 
     optim = torch.optim.Adam(model.parameters(), lr=1e-3)
     model.train()
-    wandb.watch(model)
+    wandb.watch(model, creterion=F.cross_entropy, log_freq=100, log='gradients', log_graph=False)
     wandb.log({'macs': macs, 'params': params})
 
     bar = tqdm(range(2000))
@@ -68,7 +68,7 @@ def run(model, batch_size, n_points, k, xdgcnn_k, sampling_ratio, device, offlin
         loss.backward()
         optim.step()
 
-        wandb.log({'loss': loss.item()})
+        wandb.log({'loss': loss})
         bar.set_description(f'loss: {loss.item():.8f}')
 
     wandb.finish()
