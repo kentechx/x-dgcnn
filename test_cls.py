@@ -24,7 +24,8 @@ def seed_everything(seed=0):
 @click.option('--sampling_ratio', type=tuple, default=(4, 16, 64, 256))
 @click.option('--device', default='cuda')
 @click.option('--offline', is_flag=True, default=False)
-def run(model, batch_size, n_points, k, xdgcnn_k, sampling_ratio, device, offline):
+@click.option('--name', default='debug')
+def run(model, batch_size, n_points, k, xdgcnn_k, sampling_ratio, device, offline, name):
     config = {'model': model,
               'batch_size': batch_size,
               'n_points': n_points,
@@ -41,7 +42,7 @@ def run(model, batch_size, n_points, k, xdgcnn_k, sampling_ratio, device, offlin
     else:
         raise NotImplementedError
 
-    wandb.init(project='xdgcnn_random_test', name=config['model'], config=config,
+    wandb.init(project='xdgcnn_random_test', name=name, config=config,
                mode='online' if not offline else 'disabled'
                )
 
