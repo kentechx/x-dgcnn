@@ -227,11 +227,13 @@ class XDGCNN_Cls(nn.Module):
         dims = [64, 128, 256, 512]
         stages = []
         dim_context = 64
+        downsamples = []
         for i in range(len(blocks)):
+            downsamples.append(XDownSample(dims[i], dim_context, n_points[i]))
             stages.append(nn.Sequential(
-                XDownSample(dims[i], dim_context, n_points[i]),
                 *[XEdgeConv(min(n_points[i], k), dim=dims[i]) for _ in range(blocks[i])]))
             dim_context = dims[i]
+        self.downsamples = nn.ModuleList(downsamples)
         self.stages = nn.ModuleList(stages)
 
         # head
@@ -253,7 +255,8 @@ class XDGCNN_Cls(nn.Module):
         x = self.conv(x, neighbor_ind)
 
         # go through stages
-        for stage in self.stages:
+        for downsample, stage in zip(self.downsamples, self.stages):
+            x = downsample(x)
             x = stage(x)
 
         x = x.max(dim=-1, keepdim=False)[0]  # (b, 512, n) -> (b, 512)
