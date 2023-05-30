@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from einops import repeat, rearrange, einsum, reduce
+from collections import namedtuple
+from dgl.geometry import farthest_point_sampler
 
 from .dgcnn import cdist
 
@@ -23,6 +25,17 @@ def knn(x, k):
     return selected_ind, selected_scores
 
 
+def gather(x, ind):
+    # x: (b, d, n)
+    # ind: (b, m, k)
+    # output: (b, d, m, k)
+    m = ind.size(1)
+    ind = repeat(ind, 'b m k -> b d (m k)', d=x.size(1))
+    out = x.gather(-1, ind)  # (b, d, (m k))
+    out = rearrange(out, 'b d (m k) -> b d m k', m=m)
+    return out
+
+
 class ChannelRMSNorm(nn.Module):
     def __init__(self, dim):
         super().__init__()
@@ -35,17 +48,20 @@ class ChannelRMSNorm(nn.Module):
 
 
 class XEdgeConv(nn.Module):
-    def __init__(self, k, dim=64):
+    def __init__(self, k, dim=64, in_dim=None):
         super().__init__()
         self.k = k
+        in_dim = default(in_dim, dim)
 
         self.norm1 = nn.BatchNorm1d(dim)
-        self.lin1 = nn.Conv2d(2 * dim, dim, 1, bias=False)
+        self.lin1 = nn.Conv2d(2 * in_dim, dim, 1, bias=False)
         self.act1 = nn.GELU()
 
         self.lin2 = nn.Conv2d(2 * dim, dim, 1, bias=False)
         self.norm2 = nn.BatchNorm1d(dim)
         self.act2 = nn.GELU()
+
+        self.shortcut = nn.Conv1d(in_dim, dim, 1, bias=False) if in_dim != dim else nn.Identity()
 
     def route(self, x, neighbor_ind):
         # x: (b, d, n)
@@ -71,7 +87,7 @@ class XEdgeConv(nn.Module):
         x = self.route(x, neighbor_ind)  # (b, 2*d, n, k)
         x = self.lin2(x).max(dim=-1, keepdim=False)[0]  # (b, 2*d, n, k) -> (b, d, n)
 
-        return self.act2(self.norm2(input + x))
+        return self.act2(self.norm2(self.shortcut(input) + x))
 
 
 class CrossAttention(nn.Module):
@@ -137,10 +153,36 @@ class CrossAttention(nn.Module):
         return self.to_out(out)
 
 
-class XDownSample(nn.Module):
+SampleResult = namedtuple('SampleResult', ['x', 'xyz', 'sample_ind', 'neighbor_ind'])
 
-    def __init__(self, dim, dim_context, n_points):
+
+class FarthestPointSampler(nn.Module):
+
+    def __init__(self, n_points, k=4):
         super().__init__()
+        self.n_points = n_points
+        self.k = k
+
+    def forward(self, x, xyz, start_idx=None):
+        # x: (b, d, n)
+        # xyz: (b, 3, n)
+        _xyz = rearrange(xyz, 'b d n -> b n d')
+        sample_ind = farthest_point_sampler(_xyz, self.n_points, start_idx=start_idx)  # (b, k)
+        sample_xyz = xyz.gather(-1, repeat(sample_ind, 'b k -> b d k', d=xyz.size(1)))  # (b, 3, k)
+
+        neighbor_ind = cdist(sample_xyz, xyz).topk(self.k, dim=-1, largest=False)[1]  # (b, m, k)
+
+        # recalculate sample_xyz: mean xyz
+        sample_xyz = gather(xyz, neighbor_ind).mean(dim=-1, keepdim=False)  # (b, 3, m)
+        sample_x = gather(x, neighbor_ind).max(dim=-1, keepdim=False)[0]  # (b, d, m)
+        return SampleResult(sample_x, sample_xyz, sample_ind, neighbor_ind)
+
+
+class XSampler(nn.Module):
+
+    def __init__(self, n_points, dim, dim_context=None):
+        super().__init__()
+        dim_context = default(dim_context, dim)
         self.emb = nn.Parameter(torch.randn(1, dim, n_points))
         self.attn = CrossAttention(dim, dim_context)
 
@@ -148,7 +190,7 @@ class XDownSample(nn.Module):
         # x: (b, d, n)
         emb = repeat(self.emb, '1 d n -> b d n', b=x.size(0))
         x = self.attn(emb, x)  # (b, d, n_points)
-        return x
+        return SampleResult(x, x, None, None)
 
 
 class XSpatialTransformNet(nn.Module):
@@ -203,9 +245,10 @@ class XDGCNN_Cls(nn.Module):
             *,
             in_dim,
             out_dim,
+            sampler=FarthestPointSampler,
             base_points=4096,  # the number of input points, used to determine the number of hidden points
-            sampling_ratio=(16, 64, 256, 1024),  # the ratio of hidden points to input points
-            k=4,
+            sampling_ratio=(4, 16, 64, 256),  # the ratio of hidden points to input points
+            k=8,
             dropout=0,
             head_norm=True,  # if using norm in head, disable it if the batch size is 1
     ):
@@ -222,17 +265,26 @@ class XDGCNN_Cls(nn.Module):
         self.conv = XEdgeConv(self.first_k, dim=64)
 
         # stages
-        blocks = [3, 3, 9, 3]
+        blocks = [1, 1, 1, 1]
         n_points = [base_points // r for r in sampling_ratio]
         dims = [64, 128, 256, 512]
         stages = []
-        dim_context = 64
+        pre_dim = 64
         downsamples = []
         for i in range(len(blocks)):
-            downsamples.append(XDownSample(dims[i], dim_context, n_points[i]))
+            _k = min(n_points[i], k)
+            if sampler is FarthestPointSampler:
+                downsamples.append(FarthestPointSampler(n_points[i], _k))
+            elif sampler is XSampler:
+                downsamples.append(XSampler(n_points[i], pre_dim))
+            else:
+                raise NotImplementedError
+
             stages.append(nn.Sequential(
-                *[XEdgeConv(min(n_points[i], k), dim=dims[i]) for _ in range(blocks[i])]))
-            dim_context = dims[i]
+                *[XEdgeConv(_k, dim=dims[i], in_dim=pre_dim if _ii == 0 else dims[i])
+                  for _ii in range(blocks[i])]))
+            pre_dim = dims[i]
+
         self.downsamples = nn.ModuleList(downsamples)
         self.stages = nn.ModuleList(stages)
 
@@ -247,7 +299,7 @@ class XDGCNN_Cls(nn.Module):
             nn.Linear(256, out_dim),
         )
 
-    def forward(self, x, xyz):
+    def forward(self, x, xyz, start_idx=None):
         # x: (b, d, n)
         # xyz: (b, 3, n), spatial coordinates
         neighbor_ind = cdist(xyz).topk(self.first_k, dim=-1, largest=False)[1]  # (b, n, k)
@@ -256,10 +308,16 @@ class XDGCNN_Cls(nn.Module):
 
         # go through stages
         for downsample, stage in zip(self.downsamples, self.stages):
-            x = downsample(x)
-            x = stage(x)
+            if isinstance(downsample, FarthestPointSampler):
+                sample_res = downsample(x, xyz, start_idx)
+            elif isinstance(downsample, XSampler):
+                sample_res = downsample(x)
+            else:
+                raise NotImplementedError
+            x = stage(sample_res.x)
+            xyz = sample_res.xyz
 
-        x = x.max(dim=-1, keepdim=False)[0]  # (b, 512, n) -> (b, 512)
+        x = x.mean(dim=-1, keepdim=False)  # (b, 512, n) -> (b, 512)
         x = self.head(self.dropout(x))  # (b, 512) -> (b, out_dim)
 
         return x
