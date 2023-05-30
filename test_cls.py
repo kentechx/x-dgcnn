@@ -20,7 +20,7 @@ def seed_everything(seed=0):
 @click.option('--batch_size', type=int, default=32)
 @click.option('--n_points', type=int, default=1024)
 @click.option('--k', type=int, default=20)
-@click.option('--xdgcnn_k', default=4)
+@click.option('--xdgcnn_k', default=8)
 @click.option('--sampling_ratio', type=tuple, default=(4, 16, 64, 256))
 @click.option('--device', default='cuda')
 @click.option('--offline', is_flag=True, default=False)
@@ -64,7 +64,12 @@ def run(model, batch_size, n_points, k, xdgcnn_k, sampling_ratio, device, offlin
     bar = tqdm(range(2000))
     for i in bar:
         optim.zero_grad()
-        out = model(x, xyz)
+        if isinstance(model, XDGCNN_Cls):
+            out = model(x, xyz, 0)
+        elif isinstance(model, DGCNN_Cls):
+            out = model(x, xyz)
+        else:
+            raise NotImplementedError
         loss = F.cross_entropy(out, y)
         loss.backward()
         optim.step()
