@@ -1,5 +1,8 @@
 <img src="./dgcnn.jpg" width="1200px"></img>
 
+[![PyPI version](https://badge.fury.io/py/x-dgcnn.svg)](https://badge.fury.io/py/x-dgcnn)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 # x_dgcnn
 
 A pytorch implementation of [DGCNN](https://arxiv.org/abs/1801.07829), more efficient and memory-saving than
@@ -11,9 +14,6 @@ the [comparison_with_dgcnn.pytorch](https://github.com/kentechx/x-dgcnn/tree/com
 Update: use GELU rather than LeakyReLU. Rewrite the message passing part to make it more efficient. Move the
 normalization and activation after the max pooling in all instances. Make the categorical embedding learnable.
 We try LayerNorm and InstanceNorm, and find that BatchNorm beats them by a large margin.
-
-[![PyPI version](https://badge.fury.io/py/x-dgcnn.svg)](https://badge.fury.io/py/x-dgcnn)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## Installation
 
