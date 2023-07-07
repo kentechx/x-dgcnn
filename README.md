@@ -11,6 +11,9 @@ A pytorch implementation of [DGCNN](https://arxiv.org/abs/1801.07829), more effi
 The performance in comparison with [dgcnn.pytorch](https://github.com/antao97/dgcnn.pytorch) could be found in
 the [comparison_with_dgcnn.pytorch](https://github.com/kentechx/x-dgcnn/tree/comparison_with_dgcnn.pytorch) branch.
 
+Update2: use [keops](https://github.com/getkeops/keops) to accelerate the computation of the pairwise distance matrix.
+It is memory-efficient, thus can handle larger point clouds.
+
 Update: use GELU rather than LeakyReLU. Rewrite the message passing part to make it more efficient. Move the
 normalization and activation after the max pooling in all instances. Make the categorical embedding learnable.
 We try LayerNorm and InstanceNorm, and find that BatchNorm beats them by a large margin.
@@ -23,6 +26,7 @@ pip install x-dgcnn
 
 If you suffer from the error `No matching distribution found for x-dgcnn` using a mirror source, try the following
 (if you know how to solve this problem, please open an issue):
+
 ```bash
 pip install x-dgcnn -i https://pypi.org/simple
 ```
@@ -69,7 +73,16 @@ category = torch.randint(0, 10, (10,))
 out = model(x, xyz, category)
 ```
 
+You can disable keops by calling `disable_keops()` when exporting the model to onnx.
+
+```python
+from x_dgcnn import disable_keops
+disable_keops()
+```
+
+
 ## TODO
+
 - [ ] Add differentiable subset operator and coordinate descent as another option to fuse features.
 - [ ] Scale up model size and test.
 - [ ] Add sampling to get hierarchical features.

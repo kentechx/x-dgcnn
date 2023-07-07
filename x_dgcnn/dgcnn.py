@@ -6,12 +6,12 @@ import torch.nn.functional as F
 from einops import repeat, rearrange, einsum, reduce
 from .route import subset_topk
 
-__KEOPS__ = False
+__KEOPS__ = True
 
 
-def enable_keops():
+def disable_keops():
     global __KEOPS__
-    __KEOPS__ = True
+    __KEOPS__ = False
 
 
 def exists(val):
