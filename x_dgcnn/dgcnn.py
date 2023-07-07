@@ -1,9 +1,17 @@
+from pykeops.torch import LazyTensor
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 from einops import repeat, rearrange, einsum, reduce
 from .route import subset_topk
+
+__KEOPS__ = False
+
+
+def enable_keops():
+    global __KEOPS__
+    __KEOPS__ = True
 
 
 def exists(val):
@@ -21,6 +29,19 @@ def cdist(x, y=None):
     else:
         x = rearrange(x, 'b d n -> b n d')
         return torch.cdist(x, x)
+
+
+def knn(x, y=None, k=1):
+    # x: (b, d, n)
+    # y: (b, d, m)
+    if __KEOPS__:
+        x_i = LazyTensor(rearrange(x, 'b d n -> b n 1 d').contiguous())
+        y_j = LazyTensor(rearrange(y, 'b d m -> b 1 m d').contiguous() if exists(y) else rearrange(x, 'b d n -> b 1 n d').contiguous())
+        D_ij = ((x_i - y_j) ** 2).sum(-1)  # (b, n, m)
+        neighbor_ind = D_ij.argKmin(k, axis=2)  # (b, n, k)
+    else:
+        neighbor_ind = cdist(x, y).topk(k, dim=-1, largest=False)[1]  # (b, n, k)
+    return neighbor_ind
 
 
 class EdgeConv(nn.Module):
@@ -46,7 +67,7 @@ class EdgeConv(nn.Module):
         # x: (b, d, n)
         d = x.size(1)
         if not exists(neighbor_ind):
-            neighbor_ind = cdist(x).topk(self.k, dim=-1, largest=False)[1]  # (b, n, k)
+            neighbor_ind = knn(x, k=self.k)  # (b, n, k)
 
         x = repeat(x, 'b d n -> b d n k', k=self.k)
         neighbor_ind = repeat(neighbor_ind, 'b n k -> b d n k', d=d)
@@ -155,7 +176,7 @@ class DGCNN_Cls(nn.Module):
     def forward(self, x, xyz):
         # x: (b, d, n)
         # xyz: (b, 3, n), spatial coordinates
-        neighbor_ind = cdist(xyz).topk(self.k, dim=-1, largest=False)[1]  # (b, n, k)
+        neighbor_ind = knn(xyz, k=self.k)  # (b, n, k)
 
         # go through all EdgeConv blocks
         xs = [self.blocks[0](x, neighbor_ind)]
@@ -237,7 +258,7 @@ class DGCNN_Seg(nn.Module):
         # x: (b, d, n)
         # xyz: (b, 3, n), spatial coordinates
         n = x.size(2)
-        neighbor_ind = cdist(xyz).topk(self.k, dim=-1, largest=False)[1]  # (b, n, k)
+        neighbor_ind = knn(xyz, k=self.k)  # (b, n, k)
 
         if exists(self.stn):
             transform = self.stn(x, neighbor_ind).reshape(-1, 3, 3)
