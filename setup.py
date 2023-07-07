@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 setup(
     name='x-dgcnn',
     packages=find_packages(),
-    version='0.1.2',
+    version='0.2.0',
     license='MIT',
     description='X-DGCNN - Pytorch',
     author='Kaidi Shen',
@@ -16,7 +16,8 @@ setup(
     ],
     install_requires=[
         'torch>=1.10',
-        'einops>=0.6.1'
+        'einops>=0.6.1',
+        'pykeops>=2.1.2',
     ],
     classifiers=[
         'Development Status :: 4 - Beta',
