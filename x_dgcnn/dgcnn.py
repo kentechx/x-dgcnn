@@ -208,6 +208,7 @@ class DGCNN_Seg(nn.Module):
             n_category=0,
             depth=3,
             stn: SpatialTransformNet = None,
+            head_norm=True,
             dynamic=True,
             dropout=0,
     ):
@@ -229,7 +230,7 @@ class DGCNN_Seg(nn.Module):
 
         # global linear
         self.lin = nn.Conv1d(depth * 64, emb_dim, 1, bias=False)
-        self.norm = nn.BatchNorm1d(emb_dim)
+        self.norm = nn.BatchNorm1d(emb_dim) if head_norm else nn.Identity()
         self.act = nn.GELU()
         self.dropout = nn.Dropout(dropout) if dropout > 0 else nn.Identity()
 
