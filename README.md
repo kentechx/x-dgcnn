@@ -39,7 +39,7 @@ Classification.
 import torch
 from x_dgcnn import DGCNN_Cls
 
-model = DGCNN_Cls(k=20, in_dim=3, out_dim=10)
+model = DGCNN_Cls(3, 10, 20)
 x = torch.randn(8, 3, 2048)
 xyz = x.clone()
 out = model(x, xyz)
@@ -52,7 +52,8 @@ Semantic segmentation.
 import torch
 from x_dgcnn import DGCNN_Seg
 
-model = DGCNN_Seg(k=40, in_dim=3, out_dim=10)
+# model = DGCNN_Seg(3, 10, 40, global_pooling=False)    # disable global pooling if batch size is too small
+model = DGCNN_Seg(3, 10, 40)
 x = torch.randn(8, 3, 2048)
 xyz = x.clone()
 out = model(x, xyz)
